@@ -18,7 +18,7 @@ def bandwidthLoss(circuit):
         # return np.maximum(0, (5e+3 - circuit.bandwidth) / 5e+3)
         # return (1e+6 - circuit.bandwidth) / 1e+6
     except:
-        print("bandwidth undefined", end="\r")
+        print("bandwidth undefined")
         return 1
 
 def gainLoss(circuit):

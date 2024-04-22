@@ -23,7 +23,7 @@ class PerformanceTest(unittest.TestCase):
         times = 1000
         start = time.time()
         for i in range(times):
-            print(sizer.calculators.bandwidth(frequencies, frequencyResponse), end="\r")
+            print(sizer.calculators.bandwidth(frequencies, frequencyResponse))
 
         end = time.time()
         print("Calculated", times, "bandwidth for", end - start, "with", (end - start) / times, "each.")
@@ -32,7 +32,7 @@ class PerformanceTest(unittest.TestCase):
         times = 1000
         start = time.time()
         for i in range(times):
-            print(sizer.calculators.unityGainFrequency(frequencies, frequencyResponse), end="\r")
+            print(sizer.calculators.unityGainFrequency(frequencies, frequencyResponse))
 
         end = time.time()
         print("Calculated", times, "unity gain frequencies for", end - start, "with", (end - start) / times, "each.")
@@ -41,7 +41,7 @@ class PerformanceTest(unittest.TestCase):
         times = 1000
         start = time.time()
         for i in range(times):
-            print(sizer.calculators.phaseMargin(frequencies, frequencyResponse), end="\r")
+            print(sizer.calculators.phaseMargin(frequencies, frequencyResponse))
         end = time.time()
         print("Calculated", times, "phase margin for", end - start, "with", (end - start) / times, "each.")
 

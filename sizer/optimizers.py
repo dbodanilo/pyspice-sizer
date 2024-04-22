@@ -25,7 +25,7 @@ class BaseOptimizer:
         circuit = self.circuitTemplate(parameters) # compatible to CircuitTemplateList
         loss = self.loss(circuit)
         end = time.time() # 0.1 us
-        print(f"\r total loss: {loss:10.5f}, {end - start:5.4f}s per seed", end=" ") # 9 us
+        print(f"total loss: {loss:10.5f}, {end - start:5.4f}s per seed") # 9 us
         if loss <= self.earlyStopLoss:
             raise EarlyStopLossReached("loss {} already reaches early stop loss {}.".format(loss, self.earlyStopLoss), circuit=circuit)
         return loss
