@@ -10,7 +10,7 @@ import numpy as np
 
 
 with open("./demos/two-stage-amplifier/two-stage-amp.cir") as f:
-    circuitTemplate = sizer.CircuitTemplate(f.read(), rawSpice=".lib CMOS_035_Spice_Model.lib tt")
+    circuitTemplate = sizer.CircuitTemplate(f.read())
 
 def bandwidthLoss(circuit):
     try:
