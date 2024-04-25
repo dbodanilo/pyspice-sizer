@@ -31,7 +31,7 @@ def unityGainFrequencyLoss(circuit):
         return np.maximum(0, (1e+7 - circuit.unityGainFrequency) / 1e+7) ** 2
         # return np.maximum(0, (1e+7 - circuit.unityGainFrequency) / 1e+7)
     except:
-        print("ugf undefined", end="\r")
+        print("ugf undefined")
         return 1
 
 def gainLoss(circuit):
@@ -52,7 +52,7 @@ def phaseMarginLoss(circuit):
 
 # def powerLoss(circuit):
 #     loss = np.maximum(0, (3.3 * 10e-6 - circuit.staticPower) / (3.3 * 10e-6)) ** 2
-#     print(loss, end="\r")
+#     print(loss)
 #     return loss
 
 def slewRateLossByDefinition(circuit): # slew rate loss by naive definition
@@ -70,7 +70,7 @@ def slewRateLossByRisingTime(circuit): # slew rate measured with 10% to 90% risi
     try:
         slewRate = (1.74 - 1.66) / sizer.calculators.risingTime(times, output, 1.66, 1.74)
     except:
-        print("slew rate undefined:", np.min(output), np.max(output), end="\r")
+        print("slew rate undefined:", np.min(output), np.max(output))
         return 1 # an amp whose slew rate is not defined is likely an ill amp whose output never increases to 1.75 V.
     return np.maximum(0, (10e+6 - slewRate) / 10e+6) ** 2
 
