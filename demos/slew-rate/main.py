@@ -5,6 +5,7 @@ import logging
 import sys
 import time
 
+from datetime import datetime
 from sizer import CircuitTemplate, CircuitTemplateList, calculators, optimizers
 
 
@@ -150,6 +151,10 @@ optimizer = optimizers.ScipyMinimizeOptimizer(
 )
 # optimizer = optimizers.PyswarmParticleSwarmOptimizer(templates, loss, bounds, earlyStopLoss=0)
 
+# YYYY-mm-dd_HH-mm
+_now = datetime.now().strftime("%Y-%m-%d_%H-%M")
+print(_now)
+
 start = time.time()
 # optimal circuits are returned in a list
 circuits = optimizer.run()
@@ -176,6 +181,9 @@ transientInput = tran.getInput(analysis.nodes)
 transientOutput = tran.getOutput(analysis.nodes)
 print("slew rate by rising time:",
       (1.74 - 1.66) / calculators.risingTime(transientTime, transientOutput, 1.66, 1.74))
+
+_now = datetime.now().strftime("%Y-%m-%d_%H-%M")
+print(_now)
 
 
 if _PLOT:

@@ -5,6 +5,8 @@ import logging
 import sizer
 import sys
 
+from datetime import datetime
+
 
 sys.path.append(".")
 logger = logging.getLogger()
@@ -63,6 +65,11 @@ optimizer = sizer.optimizers.Optimizer(
 # circuit = circuitTemplate([bounds[i][0] for i in circuitTemplate.parameters])
 # frequencies, frequencyResponse = circuit.getFrequencyResponse()
 # raise Exception()
+
+# YYYY-mm-dd_HH-mm
+_now = datetime.now().strftime("%Y-%m-%d_%H-%M")
+print(_now)
+
 circuit = optimizer.run()
 print(circuit.netlist)
 print("total loss:", loss(circuit))
@@ -71,6 +78,9 @@ print("optimal parameters",
 print("bandwidth:", circuit.bandwidth)
 print("gain:", circuit.gain)
 print("phase margin:", circuit.phaseMargin)
+
+_now = datetime.now().strftime("%Y-%m-%d_%H-%M")
+print(_now)
 
 
 if _PLOT:
