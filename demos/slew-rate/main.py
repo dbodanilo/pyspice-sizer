@@ -1,30 +1,41 @@
-import sys
-sys.path.append(".")
+import matplotlib.pyplot as plt
+import numpy as np
+
 import logging
+import sys
+import time
+
+from sizer import CircuitTemplate, CircuitTemplateList, calculators, optimizers
+
+
+sys.path.append(".")
 logger = logging.getLogger()
 # logger.setLevel(0)
 
-import sizer
-
-import numpy as np
-import time
+_PLOT = False
 
 with open("./demos/slew-rate/ac.cir") as f:
-    acTemplate = sizer.CircuitTemplate(f.read()) # read netlist template for ac measurement
+    # read netlist template for ac measurement
+    acTemplate = CircuitTemplate(f.read())
 
 with open("./demos/slew-rate/tran.cir") as f:
-    tranTemplate = sizer.CircuitTemplate(f.read()) # read netlist template for transient measurement
+    # read netlist template for transient measurement
+    tranTemplate = CircuitTemplate(f.read())
 
-templates = sizer.CircuitTemplateList([acTemplate, tranTemplate])
+templates = CircuitTemplateList([acTemplate, tranTemplate])
 
-def bandwidthLoss(circuit): # receive ac template
+
+# receive ac template
+def bandwidthLoss(circuit):
     try:
         return np.maximum(0, (5e+3 - circuit.bandwidth) / 5e+3) ** 2
         # return np.maximum(0, (5e+3 - circuit.bandwidth) / 5e+3)
         # return (1e+6 - circuit.bandwidth) / 1e+6
     except:
         print("bandwidth undefined")
-        return 1 # an amp whose bandwidth is not defined is likely an ill amp.
+        # an amp whose bandwidth is not defined is likely an ill amp.
+        return 1
+
 
 def unityGainFrequencyLoss(circuit):
     try:
@@ -34,17 +45,20 @@ def unityGainFrequencyLoss(circuit):
         print("ugf undefined")
         return 1
 
+
 def gainLoss(circuit):
     return np.maximum(0, (1e+3 - np.abs(circuit.gain)) / 1e+3) ** 2
     # return np.maximum(0, (1e+3 - np.abs(circuit.gain)) / 1e+3)
     # return (1e+3 - np.abs(circuit.gain)) / 1e+3
+
 
 def phaseMarginLoss(circuit):
     try:
         return np.maximum(0, (60 - circuit.phaseMargin) / 60) ** 2
         # return np.maximum(0, (60 - circuit.phaseMargin) / 60)
     except:
-        return 0 # an amp whose pm is not defined is likely a very stable amp.
+        # an amp whose pm is not defined is likely a very stable amp.
+        return 0
 
 # def areaLoss(circuit):
 #     mapping = dict(zip(circuit.circuitTemplate.parameters, circuit.parameters))
@@ -55,7 +69,9 @@ def phaseMarginLoss(circuit):
 #     print(loss)
 #     return loss
 
-def slewRateLossByDefinition(circuit): # slew rate loss by naive definition
+
+# slew rate loss by naive definition
+def slewRateLossByDefinition(circuit):
     circuit.hints["tran"]["start"] = 0.4e-6
     circuit.hints["tran"]["end"] = 0.6e-6
     circuit.hints["tran"]["points"] = 50
@@ -63,41 +79,58 @@ def slewRateLossByDefinition(circuit): # slew rate loss by naive definition
     slewRate = circuit.slewRate
     return np.maximum(0, (10e+6 - slewRate) / 10e+6) ** 2
 
-def slewRateLossByRisingTime(circuit): # slew rate measured with 10% to 90% rising time
+
+# slew rate measured with 10% to 90% rising time
+def slewRateLossByRisingTime(circuit):
     analysis = circuit.getTransientModel(start=0.4e-6, end=0.6e-6, points=50)
     times = np.array(analysis.time)
     output = circuit.getOutput(analysis.nodes)
     try:
-        slewRate = (1.74 - 1.66) / sizer.calculators.risingTime(times, output, 1.66, 1.74)
+        slewRate = (1.74 - 1.66)
+        slewRate /= calculators.risingTime(times, output, 1.66, 1.74)
     except:
         print("slew rate undefined:", np.min(output), np.max(output))
-        return 1 # an amp whose slew rate is not defined is likely an ill amp whose output never increases to 1.75 V.
+        # an amp whose slew rate is not defined is likely an ill amp whose output never increases to 1.75 V.
+        return 1
     return np.maximum(0, (10e+6 - slewRate) / 10e+6) ** 2
 
-def slewRateLossHybrid(circuit): # slew rate measured with the combination of those 2 methods above: take only the slice from 10% to 90% then measure its maximum absolute derivative.
+
+# slew rate measured with the combination of those 2 methods above: take only the slice from 10% to 90% then measure its maximum absolute derivative.
+def slewRateLossHybrid(circuit):
     analysis = circuit.getTransientModel(start=0.4e-6, end=0.6e-6, points=50)
     times = np.array(analysis.time)
     output = circuit.getOutput(analysis.nodes)
     try:
-        index1 = sizer.calculators.conditionFirstOccurrenceIndex(times, output > 1.66) # first index above 10%
-        index2 = sizer.calculators.conditionFirstOccurrenceIndex(times, output > 1.74) # first index above 90%
+        # first index above 10%
+        index1 = calculators.conditionFirstOccurrenceIndex(
+            times, output > 1.66
+        )
+        # first index above 90%
+        index2 = calculators.conditionFirstOccurrenceIndex(
+            times, output > 1.74
+        )
         slicedTimes = times[index1 - 1: index2 + 1]
         slicedOutput = output[index1 - 1: index2 + 1]
-        slewRate = np.max(np.abs(np.diff(slicedOutput) / np.diff(slicedTimes))) # maximum absolute derivative
+        # maximum absolute derivative
+        slewRate = np.max(np.abs(np.diff(slicedOutput) / np.diff(slicedTimes)))
         return np.maximum(0, (10e+6 - slewRate) / 10e+6) ** 2
     except:
         print("slew rate undefined")
         return 1
 
-def overshootLoss(circuit): # overshoot no more than 0.1 * delta
+
+# overshoot no more than 0.1 * delta
+def overshootLoss(circuit):
     analysis = circuit.getTransientModel(start=0.4e-6, end=0.6e-6, points=50)
     output = circuit.getOutput(analysis.nodes)
     return np.maximum(0, (np.max(output) - 1.76) / 1.76) ** 2
+
 
 def loss(circuit):
     ac = circuit[0]
     tran = circuit[1]
     return np.sum([phaseMarginLoss(ac), gainLoss(ac), bandwidthLoss(ac), slewRateLossByRisingTime(tran), overshootLoss(tran)])
+
 
 bounds = {
     w: [0.5e-6, 100e-6] for w in ["w12", "w34", "w5", "w6", "w7", "w8"]
@@ -111,12 +144,17 @@ bounds.update({
     "cm": [1e-12, 10e-12]
 })
 
-# optimizer = sizer.optimizers.Optimizer(templates, loss, bounds, earlyStopLoss=0)
-optimizer = sizer.optimizers.ScipyMinimizeOptimizer(templates, loss, bounds, earlyStopLoss=0)
-# optimizer = sizer.optimizers.PyswarmParticleSwarmOptimizer(templates, loss, bounds, earlyStopLoss=0)
+# optimizer = optimizers.Optimizer(templates, loss, bounds, earlyStopLoss=0)
+optimizer = optimizers.ScipyMinimizeOptimizer(
+    templates, loss, bounds, earlyStopLoss=0
+)
+# optimizer = optimizers.PyswarmParticleSwarmOptimizer(templates, loss, bounds, earlyStopLoss=0)
+
 start = time.time()
-circuits = optimizer.run() # optimal circuits are returned in a list
+# optimal circuits are returned in a list
+circuits = optimizer.run()
 end = time.time()
+
 print()
 print("finished in", end - start, "s")
 print("-" * 25)
@@ -136,30 +174,32 @@ analysis = tran.getTransientModel(0.4e-6, 0.6e-6, 100)
 transientTime = np.array(analysis.time)
 transientInput = tran.getInput(analysis.nodes)
 transientOutput = tran.getOutput(analysis.nodes)
-print("slew rate by rising time:", (1.74 - 1.66) / sizer.calculators.risingTime(transientTime, transientOutput, 1.66, 1.74))
-# exit()
+print("slew rate by rising time:",
+      (1.74 - 1.66) / calculators.risingTime(transientTime, transientOutput, 1.66, 1.74))
 
-import matplotlib.pyplot as plt
 
-plt.rcParams["axes.grid"] = True
+if _PLOT:
+    plt.rcParams["axes.grid"] = True
 
-frequencies, frequencyResponse = ac.getFrequencyResponse()
+    frequencies, frequencyResponse = ac.getFrequencyResponse()
 
-plt.subplot(311)
-plt.plot(frequencies, np.abs(frequencyResponse))
-plt.xscale("log")
-plt.yscale("log")
-plt.vlines(sizer.calculators.unityGainFrequency(frequencies, frequencyResponse), 0, 1e+3)
+    plt.subplot(311)
+    plt.plot(frequencies, np.abs(frequencyResponse))
+    plt.xscale("log")
+    plt.yscale("log")
+    plt.vlines(calculators.unityGainFrequency(
+        frequencies, frequencyResponse), 0, 1e+3)
 
-plt.subplot(312)
-phaseResponse = np.angle(frequencyResponse, deg=True)
-phaseResponse[np.where(phaseResponse > 0)] -= 360
-plt.plot(frequencies, phaseResponse)
-plt.xscale("log")
-plt.vlines(sizer.calculators.unityGainFrequency(frequencies, frequencyResponse), -180, 0)
+    plt.subplot(312)
+    phaseResponse = np.angle(frequencyResponse, deg=True)
+    phaseResponse[np.where(phaseResponse > 0)] -= 360
+    plt.plot(frequencies, phaseResponse)
+    plt.xscale("log")
+    plt.vlines(calculators.unityGainFrequency(
+        frequencies, frequencyResponse), -180, 0)
 
-plt.subplot(313)
-plt.plot(transientTime, transientInput)
-plt.plot(transientTime, transientOutput)
+    plt.subplot(313)
+    plt.plot(transientTime, transientInput)
+    plt.plot(transientTime, transientOutput)
 
-plt.show()
+    plt.show()
