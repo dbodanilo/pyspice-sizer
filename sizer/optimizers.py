@@ -6,17 +6,21 @@ import sizer
 import time
 import traceback
 
-class EarlyStopLossReached(Exception):
+class EarlyStopReached(Exception):
     def __init__(self, *args, circuit, **kwds):
         super().__init__(*args, **kwds)
         self.circuit = circuit
 
 class BaseOptimizer:
-    def __init__(self, circuitTemplate, loss, bounds, earlyStopLoss=-np.inf):
+    def __init__(self, circuitTemplate, loss, bounds, earlyStopLoss=-np.inf, earlyStopIter=800):
         self.circuitTemplate = circuitTemplate
         self.loss = loss
         self.bounds = bounds
         self.earlyStopLoss = earlyStopLoss
+        self.earlyStopIter = earlyStopIter
+
+        self.best_loss = np.inf
+        self.no_better = 0
 
         self._bounds = np.array([self.bounds[i] for i in self.circuitTemplate.parameters])
 
@@ -26,8 +30,18 @@ class BaseOptimizer:
         loss = self.loss(circuit)
         end = time.time() # 0.1 us
         print(f"total loss: {loss:10.5f}, {end - start:5.4f}s per seed") # 9 us
+
+        if loss < self.best_loss:
+            self.no_better = 0
+            self.best_loss = loss
+        else:
+            self.no_better += 1
+
+        if self.no_better > self.earlyStopIter:
+            raise EarlyStopReached("loss {} has not improved in {} iterations".format(loss, self.no_better), circuit=circuit)
+
         if loss <= self.earlyStopLoss:
-            raise EarlyStopLossReached("loss {} already reaches early stop loss {}.".format(loss, self.earlyStopLoss), circuit=circuit)
+            raise EarlyStopReached("loss {} already reaches early stop loss {}.".format(loss, self.earlyStopLoss), circuit=circuit)
         return loss
 
     def _run(self):
@@ -38,7 +52,7 @@ class BaseOptimizer:
             # sol = self._run()
             optimalParameters = self._run()
             return self.circuitTemplate(optimalParameters) # compatible to CircuitTemplateList
-        except EarlyStopLossReached as e:
+        except EarlyStopReached as e:
             traceback.print_exc()
             return e.circuit
 
