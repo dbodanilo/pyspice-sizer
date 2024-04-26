@@ -25,7 +25,14 @@ class CircuitTemplate:
         logging.debug("Circuit template:\n {}".format(self.netlist))
 
         self.formatter = string.Formatter()
-        self.parameters = list(set(i[1] for i in string.Formatter.parse(self.formatter, self.netlist) if i[1]))
+
+        self.parameters = set()
+        for i in self.formatter.parse(self.netlist):
+            # cm, w, l.
+            if i[1] and (i[1][0] in "clw"):
+                self.parameters.add(i[1])
+
+        self.parameters = list(self.parameters)
         logging.debug("{} parameters found in netlist: {}".format(len(self.parameters), self.parameters))
         
         self.rawSpice = rawSpice
@@ -98,6 +105,20 @@ class Circuit:
 
         try:
             mapping = parameters
+
+            # NOTE: calculate source/drain perimeter and area.
+            calculated = {}
+            for dim in mapping.keys():
+                if dim.startswith("w"):
+                    w = mapping[dim]
+                    # 12, 34, ..., 10
+                    pair = dim[1:]
+                    calculated["a" + pair] = w * 0.5e-6
+                    calculated["p" + pair] = 2 * (w + 0.5e-6)
+                    calculated["nr" + pair] = 0.5e-6/w
+
+            mapping.update(calculated)
+
             self._netlist = self.circuitTemplate.netlist.format(**mapping)
         except:
             traceback.print_exc()
@@ -215,6 +236,7 @@ class Circuit:
     def operationalPoint(self):
         return self._simulator.operating_point()
 
+    # Pwr
     @property
     @functools.lru_cache(maxsize=1)
     def staticPower(self):
@@ -248,6 +270,7 @@ class Circuit:
         frequencyResponse = self.getFrequencyResponse(**self.hints["ac"])
         return sizer.calculators.bandwidth(frequencyResponse[0], frequencyResponse[1])
 
+    # PM
     @property
     def phaseMargin(self):
         frequencyResponse = self.getFrequencyResponse(**self.hints["ac"])
@@ -258,16 +281,19 @@ class Circuit:
         frequencyResponse = self.getFrequencyResponse(**self.hints["ac"])
         return sizer.calculators.gainMargin(frequencyResponse[0], frequencyResponse[1])
 
+    # f_T
     @property
     def unityGainFrequency(self):
         frequencyResponse = self.getFrequencyResponse(**self.hints["ac"])
         return sizer.calculators.unityGainFrequency(frequencyResponse[0], frequencyResponse[1])
 
+    # A_{v0}
     @property
     def gain(self):
         frequencyResponse = self.getFrequencyResponse(**self.hints["ac"])
         return sizer.calculators.gain(frequencyResponse[0], frequencyResponse[1])
 
+    # SR
     @property
     def slewRate(self):
         analysis = self.getTransientModel(**self.hints["tran"])
