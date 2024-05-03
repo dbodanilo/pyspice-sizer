@@ -38,19 +38,33 @@ with open("./demos/two-stage-amplifier/two-stage-amp.cir") as f:
 
 
 def gainLoss(circuit):
-    return numpy.maximum(0, (1e3 - numpy.absolute(circuit.gain)) / 1e3) ** 2
+    return (1e3 - numpy.absolute(circuit.gain)) / 1e3
 
 
 def bandwidthLoss(circuit):
     try:
-        return numpy.maximum(0, (5e3 - circuit.bandwidth) / 5e3) ** 2
+        return (5e3 - circuit.bandwidth) / 5e3
     except:
         print("bandwidth undefined")
         return 1
 
 
 def loss(circuit):
-    return numpy.sum([gainLoss(circuit), bandwidthLoss(circuit)])
+    gl = gainLoss(circuit)
+    bl = bandwidthLoss(circuit)
+    gls = numpy.sign(gl)
+    bls = numpy.sign(bl)
+
+    # Only one has reached the goal, not the other.
+    if gls != bls:
+        if gls == -1:
+            # Zero the reached goal, to avoid biasing the
+            # optimization towards it.
+            gl = 0
+        elif bls == -1:
+            bl = 0
+
+    return numpy.sum((gl, bl))
 
 
 def evaluate(individual):
