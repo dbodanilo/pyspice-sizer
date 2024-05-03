@@ -67,11 +67,15 @@ def loss(circuit):
     return numpy.sum((gl, bl))
 
 
+def params_from_ind(ind):
+    return dict(zip((C, *LS, *WS), ind))
+
+
 def evaluate(individual):
     start = time()
 
     # NOTE: Put it in a circuit.
-    params = dict(zip((C, *LS, *WS), individual))
+    params = params_from_ind(individual)
     circuit = circuitTemplate(params)
     _loss = loss(circuit)
 
@@ -110,7 +114,7 @@ toolbox.register("evaluate", evaluate)
 
 
 # NOTE: area statistic.
-def area(individual):
+def area_key(individual):
     a = 0.0
     for l, w in zip(individual[1:7], individual[7:]):
         a += l * w
@@ -118,10 +122,30 @@ def area(individual):
     return a
 
 
-stats_fit = tools.Statistics(key=lambda ind: ind.fitness.values)
-stats_area = tools.Statistics(key=area)
+def bandwidth_key(individual):
+    params = params_from_ind(individual)
+    circuit = circuitTemplate(params)
 
-mstats = tools.MultiStatistics(fitness=stats_fit, area=stats_area)
+    try:
+        return circuit.bandwidth
+    # bandwidth undefined
+    except:
+        return 1
+
+
+def gain_key(individual):
+    params = params_from_ind(individual)
+    circuit = circuitTemplate(params)
+
+    return numpy.absolute(circuit.gain)
+
+
+stats_fit = tools.Statistics(key=lambda ind: ind.fitness.values)
+stats_area = tools.Statistics(key=area_key)
+stats_gain = tools.Statistics(key=gain_key)
+stats_bandwidth = tools.Statistics(key=bandwidth_key)
+
+mstats = tools.MultiStatistics(gain=stats_gain, bandwidth=stats_bandwidth)
 
 mstats.register("avg", numpy.mean, axis=0)
 mstats.register("std", numpy.std, axis=0)
@@ -129,10 +153,6 @@ mstats.register("min", numpy.min, axis=0)
 mstats.register("max", numpy.max, axis=0)
 
 logbook = tools.Logbook()
-# First group by the common `gen`, then group by chapters
-logbook.header = "gen", "fitness", "area"
-logbook.chapters["fitness"].header = "avg", "std"
-logbook.chapters["size"].header = "avg", "std"
 
 toolbox.register("mate", tools.cxTwoPoint)
 toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=1, indpb=0.2)
@@ -170,34 +190,44 @@ def main():
     pop, logbook = algorithms.eaSimple(pop, toolbox, CXPB, MUTPB, NGEN,
                                        stats=mstats, verbose=True)
 
+    # First group by the common `gen`, then group by chapters
+    logbook.header = "gen", "gain", "bandwidth"
+    logbook.chapters["gain"].header = "avg", "std"
+    logbook.chapters["bandwidth"].header = "avg", "std"
+
     _now = datetime.now().strftime("%Y-%m-%d_%H-%M")
     print(_now)
 
-    with open(f"./out/{_now}_deap-eaSimple_logbook.pickle", "wb") as f:
+    prefix = f"./out/{_now}_deap-eaSimple_"
+
+    with open((prefix + "logbook.pickle"), "wb") as f:
         pickle.dump(logbook, f, protocol=pickle.DEFAULT_PROTOCOL)
 
+    with open((prefix + "pop.pickle"), "wb") as f:
+        pickle.dump(pop, f, protocol=pickle.DEFAULT_PROTOCOL)
+
     gen = logbook.select("gen")
-    fit_mins = logbook.chapters["fitness"].select("min")
-    area_avgs = logbook.chapters["area"].select("avg")
+    gain_avgs = logbook.chapters["gain"].select("avg")
+    bandwidth_avgs = logbook.chapters["bandwidth"].select("avg")
 
     fig, ax1 = pyplot.subplots()
     ax2 = ax1.twinx()
 
-    ax1.plot(gen, fit_mins, "b-", label="Minimum Fitness")
+    ax1.plot(gen, gain_avgs, "b-", label="Average Gain")
     ax1.set_xlabel("Generation")
-    ax1.set_ylabel("Fitness", color="b")
+    ax1.set_ylabel("Gain (V/V)", color="b")
     for tl in ax1.get_yticklabels():
         tl.set_color("b")
 
-    ax2.plot(gen, area_avgs, "r-", label="Average Area")
-    ax2.set_ylabel("Area", color="r")
+    ax2.plot(gen, bandwidth_avgs, "r-", label="Average Bandwidth")
+    ax2.set_ylabel("Bandwidth (Hz)", color="r")
     for tl in ax2.get_yticklabels():
         tl.set_color("r")
 
     fig.legend(loc="lower left")
 
     # pyplot.show()
-    for fname in (f"./out/{_now}_deap_optimizers-fitness_area{ext}" for ext in [".pdf", ".png"]):
+    for fname in ((prefix + "gain-bandwidth" + ext) for ext in [".pdf", ".png"]):
         fig.savefig(fname)
 
     return pop, logbook
@@ -207,4 +237,4 @@ if __name__ == "__main__":
     pool = Pool()
     toolbox.register("map", pool.map)
 
-    main()
+    pop, logbook = main()
