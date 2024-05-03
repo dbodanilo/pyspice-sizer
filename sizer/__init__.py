@@ -97,7 +97,7 @@ class Circuit:
         self.parameters = parameters
 
         try:
-            mapping = dict(zip(self.circuitTemplate.parameters, parameters))
+            mapping = parameters
             self._netlist = self.circuitTemplate.netlist.format(**mapping)
         except:
             traceback.print_exc()

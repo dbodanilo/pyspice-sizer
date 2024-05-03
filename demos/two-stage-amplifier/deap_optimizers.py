@@ -2,11 +2,12 @@ import numpy
 import pickle
 import random
 
-import matplotlib.pyplot as plt
-
 from datetime import datetime
 from deap import algorithms, base, creator, tools
+from matplotlib import pyplot
 from multiprocessing import Pool
+from sizer import CircuitTemplate, calculators
+from time import time
 
 
 # cm, l12, l34, l5, l6, l7, l8,
@@ -16,26 +17,64 @@ IND_SIZE = 13
 C_MIN, C_MAX = 1e-12, 10e-12
 LW_MIN, LW_MAX = 3.5e-7, 3.5e-4
 
+C = "cm"
+PAIRS = ["12", "34", "5", "6", "7", "8"]
+LS = ["l" + p for p in PAIRS]
+WS = ["w" + p for p in PAIRS]
+
 
 # Clean up to run script interactively (ipython -i).
 classes = [
     "FitnessMax",
+    "FitnessMin",
     "Individual",
 ]
 for c in classes:
     if hasattr(creator, c):
         delattr(creator, c)
 
+with open("./demos/two-stage-amplifier/two-stage-amp.cir") as f:
+    circuitTemplate = CircuitTemplate(f.read())
+
+
+def gainLoss(circuit):
+    return numpy.maximum(0, (1e3 - numpy.absolute(circuit.gain)) / 1e3) ** 2
+
+
+def bandwidthLoss(circuit):
+    try:
+        return numpy.maximum(0, (5e3 - circuit.bandwidth) / 5e3) ** 2
+    except:
+        print("bandwidth undefined")
+        return 1
+
+
+def loss(circuit):
+    return numpy.sum([gainLoss(circuit), bandwidthLoss(circuit)])
+
 
 def evaluate(individual):
-    # Put it in a circuit.
-    l_sum = sum(individual[1:7])
-    return (l_sum, (sum(individual) - l_sum))
+    start = time()
+
+    # NOTE: Put it in a circuit.
+    params = dict(zip((C, *LS, *WS), individual))
+    circuit = circuitTemplate(params)
+    _loss = loss(circuit)
+
+    end = time()
+    print(f"total loss: {_loss:10.5f}, {end - start:5.4f}s per seed")
+
+    return (_loss,)
 
 
-# A_{v0}, f_T[, Pwr, SR, Area].
-creator.create("FitnessMax", base.Fitness, weights=(1.0, 1.0))
-creator.create("Individual", list, fitness=creator.FitnessMax)
+# A_{v0}, f_T, SR
+creator.create("FitnessMax", base.Fitness, weights=(1.0,))
+
+# loss, Pwr, Area
+creator.create("FitnessMin", base.Fitness, weights=(-1.0,))
+
+# loss
+creator.create("Individual", list, fitness=creator.FitnessMin)
 
 
 def generator():
@@ -110,11 +149,16 @@ def main():
     NPOP, NGEN = 50, 50
     CXPB, MUTPB = 0.5, 0.2
 
+    _now = datetime.now().strftime("%Y-%m-%d_%H-%M")
+    print(_now)
+
     pop = toolbox.population(n=NPOP)
     pop, logbook = algorithms.eaSimple(pop, toolbox, CXPB, MUTPB, NGEN,
-                            stats=mstats, verbose=True)
+                                       stats=mstats, verbose=True)
 
     _now = datetime.now().strftime("%Y-%m-%d_%H-%M")
+    print(_now)
+
     with open(f"./out/{_now}_deap-eaSimple_logbook.pickle", "wb") as f:
         pickle.dump(logbook, f, protocol=pickle.DEFAULT_PROTOCOL)
 
@@ -122,7 +166,7 @@ def main():
     fit_mins = logbook.chapters["fitness"].select("min")
     area_avgs = logbook.chapters["area"].select("avg")
 
-    fig, ax1 = plt.subplots()
+    fig, ax1 = pyplot.subplots()
     ax2 = ax1.twinx()
 
     ax1.plot(gen, fit_mins, "b-", label="Minimum Fitness")
@@ -138,7 +182,7 @@ def main():
 
     fig.legend(loc="lower left")
 
-    # plt.show()
+    # pyplot.show()
     for fname in (f"./out/{_now}_deap_optimizers-fitness_area{ext}" for ext in [".pdf", ".png"]):
         fig.savefig(fname)
 
@@ -150,4 +194,3 @@ if __name__ == "__main__":
     toolbox.register("map", pool.map)
 
     main()
-
