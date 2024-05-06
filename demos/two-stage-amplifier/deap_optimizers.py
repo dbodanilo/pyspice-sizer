@@ -211,23 +211,26 @@ def main():
     bandwidth_avgs = logbook.chapters["bandwidth"].select("avg")
 
     fig, ax1 = pyplot.subplots()
-    ax2 = ax1.twinx()
 
     ax1.plot(gen, gain_avgs, "b-", label="Average Gain")
     ax1.set_xlabel("Generation")
     ax1.set_ylabel("Gain (V/V)", color="b")
+    ax1.set_yscale("log")
     for tl in ax1.get_yticklabels():
         tl.set_color("b")
 
+    ax2 = ax1.twinx()
     ax2.plot(gen, bandwidth_avgs, "r-", label="Average Bandwidth")
     ax2.set_ylabel("Bandwidth (Hz)", color="r")
+    ax2.set_yscale("log")
     for tl in ax2.get_yticklabels():
         tl.set_color("r")
 
-    fig.legend(loc="lower left")
+    # Ideally, the graph would be increasing (/).
+    fig.legend(loc="lower right")
 
     # pyplot.show()
-    for fname in ((prefix + "gain-bandwidth" + ext) for ext in [".pdf", ".png"]):
+    for fname in ((prefix + "gain-bandwidth-yscale_log" + ext) for ext in [".pdf", ".png"]):
         fig.savefig(fname)
 
     return pop, logbook
