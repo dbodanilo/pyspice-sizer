@@ -6,7 +6,7 @@ from datetime import datetime
 from deap import algorithms, base, creator, tools
 from matplotlib import pyplot
 from multiprocessing import Pool
-from sizer import CircuitTemplate, calculators
+from sizer import CircuitTemplate
 from time import time
 
 
