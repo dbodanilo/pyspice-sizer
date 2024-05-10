@@ -22,24 +22,35 @@ PAIRS = ["12", "34", "5", "6", "7", "8"]
 LS = ["l" + p for p in PAIRS]
 WS = ["w" + p for p in PAIRS]
 
-# NPOP, NGEN = 50, 50
-# CXPB, MUTPB = 0.5, 0.2
+BOUND_LOW = [C_MIN] + [LW_MIN] * (len(LS) + len(WS))
+BOUND_UP = [C_MAX] + [LW_MAX] * (len(LS) + len(WS))
+
+NDIM = 1 + len(LS) + len(WS)
+
+# DEAP
+NGEN = 50  # eaSimple
+# NGEN = 400  # nsga3
+# CXPB = 1.0
+# MUTPB = 1.0
+# ETA_C = 30.0
+# ETA_M = 30.0
+
+# Leme, 2012
+# NGEN = 6000
+CXPB = 0.8
+MUTPB = 0.07
+ETA_C = 20.0
+ETA_M = 12.0
 
 # Multiobjective
 # $A_{v0}$, $f_T$
 NOBJ = 2
 K = 10
-NDIM = 1 + len(LS) + len(WS)
 P = 12
 # (NOBJ + P - 1)! / (P! * (NOBJ - 1)!)
 H = factorial(NOBJ + P - 1) / factorial(P) / factorial(NOBJ - 1)
-BOUND_LOW = [C_MIN] + [LW_MIN] * (len(LS) + len(WS))
-BOUND_UP = [C_MAX] + [LW_MAX] * (len(LS) + len(WS))
 
 MU = int(H + (4 - H % 4))
-NGEN = 400
-CXPB = 1.0
-MUTPB = 1.0
 
 EXTS = ["pdf", "png"]
 
@@ -180,55 +191,33 @@ creator.create("Individual", list, fitness=creator.FitnessMax)
 
 
 toolbox = base.Toolbox()
-# toolbox.register("attr_c", random.uniform, C_MIN, C_MAX)
-# toolbox.register("attr_lw", random.uniform, LW_MIN, LW_MAX)
-# toolbox.register("attr_lws", tools.initRepeat, list,
-#                  toolbox.attr_lw, n=(IND_SIZE - 1))
 toolbox.register("individual", tools.initIterate, creator.Individual,
                  generator)
 
 toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
 toolbox.register("evaluate", evaluate)
-# toolbox.register("select", tools.selTournament, tournsize=3)
-toolbox.register("select", tools.selNSGA3, ref_points=ref_points)
 
 toolbox.register("mate", tools.cxSimulatedBinaryBounded,
-                 low=BOUND_LOW, up=BOUND_UP, eta=30.0)
+                 low=BOUND_LOW, up=BOUND_UP, eta=ETA_C)
 toolbox.register("mutate", tools.mutPolynomialBounded,
-                 low=BOUND_LOW, up=BOUND_UP, eta=30.0, indpb=1.0/NDIM)
+                 low=BOUND_LOW, up=BOUND_UP, eta=ETA_M, indpb=1.0/NDIM)
 
-# toolbox.register("mate", tools.cxTwoPoint)
-# toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=1, indpb=0.2)
+toolbox.register("select", tools.selNSGA3, ref_points=ref_points)
 
-# NOTE: No need to decorate Bounded function.
-# toolbox.decorate("mate", checkBounds)
-# toolbox.decorate("mutate", checkBounds)
+stats_fit = tools.Statistics(key=lambda ind: ind.fitness.values)
+# stats_area = tools.Statistics(key=area_key)
 
-# stats_fit = tools.Statistics(key=lambda ind: ind.fitness.values)
-stats_area = tools.Statistics(key=area_key)
-stats_gain = tools.Statistics(key=gain_key)
-stats_bandwidth = tools.Statistics(key=bandwidth_key)
+# NOTE: avoid _keys, as they take time to instantiate the circuit.
+# stats_gain = tools.Statistics(key=gain_key)
+# stats_bandwidth = tools.Statistics(key=bandwidth_key)
 
-# fitness=stats_fit
-mstats = tools.MultiStatistics(gain=stats_gain,
-                               bandwidth=stats_bandwidth,
-                               area=stats_area)
+mstats = tools.MultiStatistics(fitness=stats_fit)
 
 mstats.register("avg", numpy.mean, axis=0)
 mstats.register("std", numpy.std, axis=0)
 mstats.register("min", numpy.min, axis=0)
 mstats.register("max", numpy.max, axis=0)
-
-logbook = tools.Logbook()
-
-# First group by the common `gen`, then group by chapters
-# , "fitness"
-logbook.header = "gen", "evals", "gain", "bandwidth", "area"
-logbook.chapters["gain"].header = "avg", "std", "min", "max"
-logbook.chapters["bandwidth"].header = "avg", "std", "min", "max"
-logbook.chapters["area"].header = "avg", "std", "min", "max"
-# logbook.chapters["fitness"].header = "avg", "std", "min", "max"
 
 
 def main(seed=None):
@@ -236,6 +225,12 @@ def main(seed=None):
     print(_now)
 
     random.seed(seed)
+
+    logbook = tools.Logbook()
+
+    # First group by the common `gen`, `nevals`, then group by chapters
+    logbook.header = "gen", "nevals", "fitness"
+    logbook.chapters["fitness"].header = "avg", "std", "min", "max"
 
     pop = toolbox.population(n=MU)
 
@@ -246,7 +241,7 @@ def main(seed=None):
         ind.fitness.values = fit
 
     record = mstats.compile(pop)
-    logbook.record(gen=0, evals=len(invalid_ind), **record)
+    logbook.record(gen=0, nevals=len(invalid_ind), **record)
     print(logbook.stream)
 
     # Begin the generational process
@@ -265,7 +260,7 @@ def main(seed=None):
 
         # Compile statistics about the new population
         record = mstats.compile(pop)
-        logbook.record(gen=gen, evals=len(invalid_ind), **record)
+        logbook.record(gen=gen, nevals=len(invalid_ind), **record)
         print(logbook.stream)
 
     _now = datetime.now().strftime("%Y-%m-%d_%H-%M")
@@ -280,8 +275,9 @@ def main(seed=None):
         pickle.dump(pop, f, protocol=pickle.DEFAULT_PROTOCOL)
 
     gen = logbook.select("gen")
-    gain_avgs = logbook.chapters["gain"].select("avg")
-    bandwidth_avgs = logbook.chapters["bandwidth"].select("avg")
+    fitness_avgs = numpy.array(logbook.chapters["fitness"].select("avg"))
+    gain_avgs = fitness_avgs[:, 0]
+    bandwidth_avgs = fitness_avgs[:, 1]
 
     fig, ax1 = pyplot.subplots()
 
@@ -299,32 +295,31 @@ def main(seed=None):
     for tl in ax2.get_yticklabels():
         tl.set_color("r")
 
-    # Ideally, the graph would be increasing (/),
-    # so loc="lower right", seems to be appropriate.
     fig.legend()
 
     for fname in ((prefix + "gain_bandwidth-yscale_log." + ext) for ext in EXTS):
         fig.savefig(fname)
-    # pyplot.show()
+    # NOTE: savefig() before show(), as it clears the figure.
+    pyplot.show()
 
     pop_fit = numpy.array([ind.fitness.values for ind in pop])
 
-    # figsize=(7, 7)
     fig, ax = pyplot.subplots()
-    ax.scatter(pop_fit[:, 0], pop_fit[:, 1], marker="o",
+
+    # Same order as in Bode plot (frequency on x axis).
+    ax.scatter(pop_fit[:, 1], pop_fit[:, 0], marker="o",
                s=24, label="Final Population")
 
-    ax.scatter(ref_points[:, 0], ref_points[:, 1], marker="o",
+    ax.scatter(ref_points[:, 1], ref_points[:, 0], marker="o",
                s=24, label="Reference Points")
 
-    ax.set_xlabel("Gain (V/V)")
-    ax.set_ylabel("Bandwidth (Hz)")
+    ax.set_xlabel("Bandwidth (Hz)")
+    ax.set_ylabel("Gain (V/V)")
 
     ax.set_xscale("log")
     ax.set_yscale("log")
-    # ax.autoscale(tight=True)
+
     fig.legend()
-    # pyplot.tight_layout()
 
     for fname in (prefix + "pareto_front-scale_log." + ext for ext in EXTS):
         fig.savefig(fname)
