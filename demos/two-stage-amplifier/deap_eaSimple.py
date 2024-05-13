@@ -60,7 +60,7 @@ def bandwidth_key(individual):
         return circuit.bandwidth
     # bandwidth undefined
     except:
-        return 1
+        return 0
 
 
 def bandwidth_loss(circuit):

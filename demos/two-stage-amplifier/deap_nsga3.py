@@ -72,7 +72,7 @@ def bandwidth_key(individual):
         return circuit.bandwidth
     # bandwidth undefined
     except:
-        return 1
+        return 0
 
 
 def bandwidth_loss(circuit):
@@ -111,7 +111,7 @@ def evaluate(individual):
     try:
         bandwidth = circuit.bandwidth
     except:
-        bandwidth = 1
+        bandwidth = 0
 
     # end = time()
     # print(f"total loss: {_loss:10.5f}, {end - start:5.4f}s per seed")
