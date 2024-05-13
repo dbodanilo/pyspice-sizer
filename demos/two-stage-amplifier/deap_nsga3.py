@@ -4,7 +4,7 @@ import random
 
 from datetime import datetime
 from deap import algorithms, base, creator, tools
-from math import factorial
+from math import comb
 from matplotlib import pyplot
 from multiprocessing import Pool
 from sizer import CircuitTemplate
@@ -34,6 +34,7 @@ NGEN = 50  # eaSimple
 # MUTPB = 1.0
 # ETA_C = 30.0
 # ETA_M = 30.0
+# P = 12
 
 # Leme, 2012
 # NGEN = 6000
@@ -43,14 +44,21 @@ ETA_C = 20.0
 ETA_M = 12.0
 
 # Multiobjective
-# $A_{v0}$, $f_T$
-NOBJ = 2
-K = 10
-P = 12
-# (NOBJ + P - 1)! / (P! * (NOBJ - 1)!)
-H = factorial(NOBJ + P - 1) / factorial(P) / factorial(NOBJ - 1)
 
-MU = int(H + (4 - H % 4))
+# $A_{v0}$, $f_T$
+# NOBJ = 2
+
+# A_{v0}, f_T, Pwr, SR, Area
+NOBJ = 5
+
+# Deb, 2014
+P = 6
+# (P + NOBJ - 1)! / (P! * (NOBJ - 1)!)
+# H = factorial(P + NOBJ - 1) / factorial(P) / factorial(NOBJ - 1)
+H = comb(P + NOBJ - 1, P)  # P = 6, NOBJ = 5 -> H = 210
+
+# first multiple of 4 higher than or equal to H.
+MU = int(H + (4 - H % 4))  # H = 210 -> MU = 212
 
 EXTS = ["pdf", "png"]
 
@@ -113,9 +121,16 @@ def evaluate(individual):
     except:
         bandwidth = 0
 
+    power = circuit.staticPower
+
+    # TODO: review the need for hints.
+    slew_rate = circuit.slewRate
+
+    area = area_key(individual)
+
     # end = time()
     # print(f"total loss: {_loss:10.5f}, {end - start:5.4f}s per seed")
-    return gain, bandwidth
+    return gain, bandwidth, power, slew_rate, area
 
 
 def evaluate_to_snd(individual):
@@ -180,14 +195,17 @@ with open("./demos/two-stage-amplifier/two-stage-amp.cir") as f:
 
 ref_points = tools.uniform_reference_points(NOBJ, P)
 
-# A_{v0}, f_T[, SR]
-creator.create("FitnessMax", base.Fitness, weights=(1.0, ) * NOBJ)
+# A_{v0}, f_T, Pwr, SR, Area
+creator.create("FitnessAmp", base.Fitness, weights=(1.0, 1.0, -1.0, 1.0, -1.0))
 
-# loss[, Pwr, Area]
-creator.create("FitnessMin", base.Fitness, weights=(-1.0,))
+# A_{v0}, f_T, SR
+creator.create("FitnessMax", base.Fitness, weights=(1.0, ) * 3)
+
+# Pwr, Area[, loss]
+creator.create("FitnessMin", base.Fitness, weights=(-1.0,) * 2)
 
 # A_{v0}, f_T
-creator.create("Individual", list, fitness=creator.FitnessMax)
+creator.create("Individual", list, fitness=creator.FitnessAmp)
 
 
 toolbox = base.Toolbox()
