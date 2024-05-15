@@ -284,7 +284,7 @@ def main(seed=None):
     _now = datetime.now().strftime("%Y-%m-%d_%H-%M")
     print(_now)
 
-    prefix = f"./out/{_now}_deap_nsga3-"
+    prefix = f"./out/two-stage-amp/{_now}_deap_nsga3-"
 
     with open((prefix + "logbook.pickle"), "wb") as f:
         pickle.dump(logbook, f, protocol=pickle.DEFAULT_PROTOCOL)

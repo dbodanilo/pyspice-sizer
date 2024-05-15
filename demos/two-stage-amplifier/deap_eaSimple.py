@@ -33,8 +33,8 @@ NGEN = 50
 # MUTPB = 0.2
 
 # Leme, 2012:
+# NGEN = 1000  # or 6000
 NPOP = 200
-# NGEN = 6000
 CXPB = 0.8
 MUTPB = 0.07
 ETA_C = 20.0
@@ -139,6 +139,15 @@ def params_from_ind(ind):
     return dict(zip((C, *LS, *WS), ind))
 
 
+# TODO (Leme, 2012): use phase margin as a restriction.
+def phase_margin_loss(circuit):
+    try:
+        return numpy.maximum(0, (60 - circuit.phaseMargin) / 60) ** 2
+        # return np.maximum(0, (60 - circuit.phaseMargin) / 60)
+    except:
+        return 0
+
+
 # Clean up to run script interactively (ipython).
 classes = [
     "FitnessMax",
@@ -154,9 +163,9 @@ with open("./demos/two-stage-amplifier/two-stage-amp.cir") as f:
 
 
 # A_{v0}, f_T, SR
-creator.create("FitnessMax", base.Fitness, weights=(1.0,))
+creator.create("FitnessMax", base.Fitness, weights=(1.0,) * 3)
 
-# loss, Pwr, Area
+# loss[, Pwr, Area]
 creator.create("FitnessMin", base.Fitness, weights=(-1.0,))
 
 # loss
@@ -196,7 +205,6 @@ stats_bandwidth = tools.Statistics(key=bandwidth_key)
 mstats = tools.MultiStatistics(fitness=stats_fit,
                                gain=stats_gain,
                                bandwidth=stats_bandwidth)
-
 mstats.register("avg", numpy.mean, axis=0)
 mstats.register("std", numpy.std, axis=0)
 mstats.register("min", numpy.min, axis=0)
@@ -204,6 +212,7 @@ mstats.register("max", numpy.max, axis=0)
 
 
 def main(seed=None):
+    # YYYY-mm-dd_HH-mm
     _now = datetime.now().strftime("%Y-%m-%d_%H-%M")
     print(_now)
 
@@ -213,16 +222,16 @@ def main(seed=None):
     pop, logbook = algorithms.eaSimple(pop, toolbox, CXPB, MUTPB, NGEN,
                                        stats=mstats, verbose=True)
 
+    _now = datetime.now().strftime("%Y-%m-%d_%H-%M")
+    print(_now)
+
+    prefix = f"./out/two-stage-amp/{_now}_deap_eaSimple-"
+
     # First group by the common `gen`, `nevals`, then group by chapters
     logbook.header = "gen", "nevals", "gain", "bandwidth", "fitness"
     logbook.chapters["gain"].header = "avg", "std", "min", "max"
     logbook.chapters["bandwidth"].header = "avg", "std", "min", "max"
     logbook.chapters["fitness"].header = "avg", "std", "min", "max"
-
-    _now = datetime.now().strftime("%Y-%m-%d_%H-%M")
-    print(_now)
-
-    prefix = f"./out/{_now}_deap_eaSimple-"
 
     with open((prefix + "logbook.pickle"), "wb") as f:
         pickle.dump(logbook, f, protocol=pickle.DEFAULT_PROTOCOL)
@@ -233,6 +242,9 @@ def main(seed=None):
     gen = logbook.select("gen")
     gain_avgs = logbook.chapters["gain"].select("avg")
     bandwidth_avgs = logbook.chapters["bandwidth"].select("avg")
+
+    pop_keys = numpy.array(
+        [(gain_key(ind), bandwidth_key(ind)) for ind in pop])
 
     fig, ax1 = pyplot.subplots()
 
@@ -254,16 +266,14 @@ def main(seed=None):
 
     for fname in ((prefix + "gain_bandwidth-yscale_log." + ext) for ext in EXTS):
         fig.savefig(fname)
-    # NOTE: savefig() before show(), as it clears the figure.
+    # NOTE: savefig() before show(), as the latter clears the figure.
     pyplot.show()
-
-    pop_fit = numpy.array([(gain_key(ind), bandwidth_key(ind)) for ind in pop])
 
     fig, ax = pyplot.subplots()
 
     # Same order as in Bode plot (frequency on x axis).
-    ax.scatter(pop_fit[:, 1], pop_fit[:, 0], marker="o",
-               s=24, label="Final Population")
+    ax.scatter(pop_keys[:, 1], pop_keys[:, 0], marker="o",
+                s=24, label="Final Population")
 
     ax.set_xlabel("Bandwidth (Hz)")
     ax.set_ylabel("Gain (V/V)")
