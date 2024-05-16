@@ -5,12 +5,12 @@ C1 Vo GND 3p
 
 * ipol u, braces ommited to avoid key not found error.
 * median(Ipol) == 4\micro\ampere
-I1 GND Ip dc=4e-6
+I1 GND Ip dc={ipol}
 
 V0 VDD GND 3
 * vpol
 * median(Vpol) == 1.33\volt
-V1 Vp GND dc=1.33
+V1 Vp GND dc={vpol}
 V2 Vn Vp dc=0 acmag=1
 
 M1 n01 Vn n02 n02 nmosmod l={l12} w={w12}
