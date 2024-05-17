@@ -1,4 +1,5 @@
 import numpy
+import os
 import pickle
 import random
 
@@ -27,7 +28,7 @@ BOUND_UP = [C_MAX] + [LW_MAX] * (len(LS) + len(WS))
 
 NDIM = 1 + len(LS) + len(WS)
 
-# DEAP
+# DEAP:
 NGEN = 50  # eaSimple
 # NGEN = 400  # nsga3
 # CXPB = 1.0
@@ -36,8 +37,9 @@ NGEN = 50  # eaSimple
 # ETA_M = 30.0
 # P = 12
 
-# Leme, 2012
-# NGEN = 6000
+# Leme, 2012:
+# NGEN = 1000  # or 6000
+# NPOP = 200  # replaced by MU
 CXPB = 0.8
 MUTPB = 0.07
 ETA_C = 20.0
@@ -72,6 +74,7 @@ def area_key(individual):
     return a
 
 
+# TODO: avoid keys that instantiate a new circuit.
 def bandwidth_key(individual):
     params = params_from_ind(individual)
     circuit = circuitTemplate(params)
@@ -137,6 +140,7 @@ def evaluate_to_snd(individual):
     return (individual, toolbox.evaluate(individual))
 
 
+# TODO: avoid instantiating a new circuit.
 def gain_key(individual):
     params = params_from_ind(individual)
     circuit = circuitTemplate(params)
@@ -180,8 +184,18 @@ def to_snd(f):
     return wrapper
 
 
+# TODO (Leme, 2012): use phase margin as a restriction.
+def phase_margin_loss(circuit):
+    try:
+        return numpy.maximum(0, (60 - circuit.phaseMargin) / 60) ** 2
+        # return np.maximum(0, (60 - circuit.phaseMargin) / 60)
+    except:
+        return 0
+
+
 # Clean up to run script interactively (ipython).
 classes = [
+    "FitnessAmp",
     "FitnessMax",
     "FitnessMin",
     "Individual",
@@ -204,7 +218,7 @@ creator.create("FitnessMax", base.Fitness, weights=(1.0, ) * 3)
 # Pwr, Area[, loss]
 creator.create("FitnessMin", base.Fitness, weights=(-1.0,) * 2)
 
-# A_{v0}, f_T
+# Five amplifier metrics
 creator.create("Individual", list, fitness=creator.FitnessAmp)
 
 
@@ -216,6 +230,7 @@ toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
 toolbox.register("evaluate", evaluate)
 
+# Leme, 2012:
 toolbox.register("mate", tools.cxSimulatedBinaryBounded,
                  low=BOUND_LOW, up=BOUND_UP, eta=ETA_C)
 toolbox.register("mutate", tools.mutPolynomialBounded,
@@ -231,7 +246,6 @@ stats_fit = tools.Statistics(key=lambda ind: ind.fitness.values)
 # stats_bandwidth = tools.Statistics(key=bandwidth_key)
 
 mstats = tools.MultiStatistics(fitness=stats_fit)
-
 mstats.register("avg", numpy.mean, axis=0)
 mstats.register("std", numpy.std, axis=0)
 mstats.register("min", numpy.min, axis=0)
@@ -239,6 +253,7 @@ mstats.register("max", numpy.max, axis=0)
 
 
 def main(seed=None):
+    # YYYY-mm-dd_HH-mm
     _now = datetime.now().strftime("%Y-%m-%d_%H-%M")
     print(_now)
 
@@ -285,6 +300,8 @@ def main(seed=None):
     print(_now)
 
     prefix = f"./out/two-stage-amp/{_now}_deap_nsga3-"
+    prefix_dir = prefix[:prefix.rfind("/")]
+    os.makedirs(prefix_dir, exist_ok=True)
 
     with open((prefix + "logbook.pickle"), "wb") as f:
         pickle.dump(logbook, f, protocol=pickle.DEFAULT_PROTOCOL)
@@ -296,6 +313,8 @@ def main(seed=None):
     fitness_avgs = numpy.array(logbook.chapters["fitness"].select("avg"))
     gain_avgs = fitness_avgs[:, 0]
     bandwidth_avgs = fitness_avgs[:, 1]
+
+    pop_fit = numpy.array([ind.fitness.values for ind in pop])
 
     fig, ax1 = pyplot.subplots()
 
@@ -320,8 +339,6 @@ def main(seed=None):
     # NOTE: savefig() before show(), as it clears the figure.
     pyplot.show()
 
-    pop_fit = numpy.array([ind.fitness.values for ind in pop])
-
     fig, ax = pyplot.subplots()
 
     # Same order as in Bode plot (frequency on x axis).
@@ -339,7 +356,7 @@ def main(seed=None):
 
     fig.legend()
 
-    for fname in (prefix + "pareto_front-scale_log." + ext for ext in EXTS):
+    for fname in ((prefix + "pareto_front-scale_log." + ext) for ext in EXTS):
         fig.savefig(fname)
     pyplot.show()
 
