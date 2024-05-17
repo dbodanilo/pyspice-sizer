@@ -2,6 +2,7 @@ import numpy
 import os
 import pickle
 import random
+import sys
 
 from datetime import datetime
 from deap import algorithms, base, creator, tools
@@ -269,14 +270,13 @@ pop = toolbox.population(n=MU)
 checkpoint = 50
 
 
-def main(seed=None):
+def main(seed=None, prefix_dir="./out/single-stage-amp/", model="deap_nsga3"):
     # YYYY-mm-dd_HH-mm
     _now = datetime.now().strftime("%Y-%m-%d_%H-%M")
     print(_now)
 
-    prefix_dir = "./out/single-stage-amp/"
     os.makedirs(prefix_dir, exist_ok=True)
-    model = f"deap_nsga3-seed_{seed}"
+    model = f"{model}-seed_{seed}"
     prefix = f"{prefix_dir}{_now}_{model}-"
 
     random.seed(seed)
@@ -422,4 +422,26 @@ if __name__ == "__main__":
     pool = Pool()
     toolbox.register("map", pool.map)
 
-    pop, logbook = main()
+    stdout = sys.stdout
+    stderr = sys.stderr
+
+    prefix_dir = "./out/single-stage-amp/"
+    os.makedirs(prefix_dir, exist_ok=True)
+    model = "deap_nsga3-params_deb"
+
+    # pop, logbook = main()
+    for seed in range(1241, 1246):
+        _now = datetime.now().strftime("%Y-%m-%d_%H-%M")
+        print(_now, "seed:", seed)
+        prefix = f"{prefix_dir}{_now}_{model}-seed_{seed}-"
+
+        with open((prefix + "run.log"), "a") as run_log:
+            sys.stdout = run_log
+            with open((prefix + "error.log"), "a") as err_log:
+                sys.stderr = err_log
+                main(seed=seed, prefix_dir=prefix_dir, model=model)
+                sys.stderr = stderr
+            sys.stdout = stdout
+
+        _now = datetime.now().strftime("%Y-%m-%d_%H-%M")
+        print(_now, "seed:", seed)
