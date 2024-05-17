@@ -66,11 +66,23 @@ EXTS = ["pdf", "png"]
 # NOTE: area statistic.
 def area_key(individual):
     a = 0.0
+
     ls = individual[2:(2 + len(LS))]
     ws = individual[-len(WS):]
     assert len(ls) == len(ws)
+
+    # l_pairs = ls[:-2]
+    l_singles = ls[-2:]
+
+    # w_pairs = ws[:-2]
+    w_singles = ws[-2:]
+
     for l, w in zip(ls, ws):
-        a += l * w
+        a += 2 * l * w
+
+    # reiterate over singles, as there are only two of them.
+    for l, w in zip(l_singles, w_singles):
+        a -= l * w
 
     return a
 
