@@ -262,9 +262,10 @@ def main(seed=None):
     _now = datetime.now().strftime("%Y-%m-%d_%H-%M")
     print(_now)
 
-    prefix = f"./out/single-stage-amp/{_now}_deap_nsga3-seed_{seed}-"
-    prefix_dir = prefix[:prefix.rfind("/")]
+    prefix_dir = "./out/single-stage-amp/"
     os.makedirs(prefix_dir, exist_ok=True)
+    model = f"deap_nsga3-seed_{seed}"
+    prefix = f"{prefix_dir}{_now}_{model}-"
 
     random.seed(seed)
 
@@ -311,8 +312,7 @@ def main(seed=None):
     _now = datetime.now().strftime("%Y-%m-%d_%H-%M")
     print(_now)
 
-    prefix = f"./out/single-stage-amp/{_now}_deap_nsga3-"
-    prefix_dir = prefix[:prefix.rfind("/")]
+    prefix = f"{prefix_dir}{_now}_{model}-"
     os.makedirs(prefix_dir, exist_ok=True)
 
     with open((prefix + "logbook.pickle"), "wb") as f:
