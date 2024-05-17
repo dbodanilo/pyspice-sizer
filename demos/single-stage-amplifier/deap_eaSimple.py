@@ -67,7 +67,7 @@ def bandwidth_key(individual):
     circuit = circuitTemplate(params)
 
     try:
-        return circuit.bandwidth
+        return circuit.unityGainFrequency
     # bandwidth undefined
     except:
         return 0
@@ -76,7 +76,7 @@ def bandwidth_key(individual):
 def bandwidth_loss(circuit):
     try:
         # Leme, 2012: median(f_T) [50%] = 397.747 MHz
-        return (400e6 - circuit.bandwidth) / 400e6
+        return (400e6 - circuit.unityGainFrequency) / 400e6
     except:
         return 1
 

@@ -20,9 +20,7 @@ with open("./demos/single-stage-amplifier/single-stage-amp.cir") as f:
 
 def bandwidthLoss(circuit):
     try:
-        return np.maximum(0, (5e+3 - circuit.bandwidth) / 5e+3) ** 2
-        # return np.maximum(0, (5e+3 - circuit.bandwidth) / 5e+3)
-        # return (1e+6 - circuit.bandwidth) / 1e+6
+        return np.maximum(0, (5e+3 - circuit.unityGainFrequency) / 5e+3) ** 2
     except:
         print("bandwidth undefined")
         return 1
@@ -83,7 +81,7 @@ print(circuit.netlist)
 print("total loss:", loss(circuit))
 print("optimal parameters",
       dict(zip(circuitTemplate.parameters, circuit.parameters)))
-print("bandwidth:", circuit.bandwidth)
+print("bandwidth:", circuit.unityGainFrequency)
 print("gain:", circuit.gain)
 print("phase margin:", circuit.phaseMargin)
 
