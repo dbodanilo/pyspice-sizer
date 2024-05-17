@@ -42,12 +42,21 @@ NDIM = 2 + len(LS) + len(WS)
 # NGEN = 400  # nsga3
 
 # Leme, 2012:
-NGEN = 1000  # or 6000
+# NGEN = 1000  # or 6000
 # NPOP = 200  # replaced by MU
-CXPB = 0.8
-MUTPB = 0.07
-ETA_C = 20.0
-ETA_M = 12.0
+# CXPB = 0.8
+# MUTPB = 0.07
+# ETA_C = 20.0
+# ETA_M = 12.0
+
+# Deb, 2014:
+NGEN = 350  # [350..1000]
+CXPB = 1.0  # p_c
+MUTPB = 1.0  # TODO: review if this is correct.
+P_M = 1.0/NDIM
+ETA_C = 30.0
+ETA_M = 20.0
+
 
 # Multiobjective
 # A_{v0}, f_T, Pwr, SR, Area
@@ -232,7 +241,7 @@ toolbox.register("evaluate", evaluate)
 toolbox.register("mate", tools.cxSimulatedBinaryBounded,
                  low=BOUND_LOW, up=BOUND_UP, eta=ETA_C)
 toolbox.register("mutate", tools.mutPolynomialBounded,
-                 low=BOUND_LOW, up=BOUND_UP, eta=ETA_M, indpb=1.0/NDIM)
+                 low=BOUND_LOW, up=BOUND_UP, eta=ETA_M, indpb=P_M)
 
 toolbox.register("select", tools.selNSGA3, ref_points=ref_points)
 
