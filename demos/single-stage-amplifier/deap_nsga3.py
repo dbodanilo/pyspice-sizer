@@ -12,6 +12,7 @@ from sizer import CircuitTemplate
 
 
 _PLOT = True
+_SHOW = False
 
 # ipol, vpol, l12, l34, l56, l78, l9, l10
 #             w12, w34, w56, w78, w9, w10
@@ -362,8 +363,12 @@ def main(seed=None):
 
     for fname in ((prefix + "gain_bandwidth-yscale_log." + ext) for ext in EXTS):
         fig.savefig(fname)
+
     # NOTE: savefig() before show(), as the latter clears the figure.
-    pyplot.show()
+    if _SHOW:
+        pyplot.show()
+    else:
+        pyplot.close("all")
 
     fig, ax = pyplot.subplots()
 
@@ -384,7 +389,11 @@ def main(seed=None):
 
     for fname in ((prefix + "pareto_front-scale_log." + ext) for ext in EXTS):
         fig.savefig(fname)
-    pyplot.show()
+
+    if _SHOW:
+        pyplot.show()
+    else:
+        pyplot.close("all")
 
     return pop, logbook
 
