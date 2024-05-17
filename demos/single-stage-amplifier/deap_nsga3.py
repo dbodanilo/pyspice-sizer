@@ -38,11 +38,11 @@ BOUND_UP = [I_MAX, V_MAX] + [LW_MAX] * (len(LS) + len(WS))
 NDIM = 2 + len(LS) + len(WS)
 
 # DEAP:
-NGEN = 50  # eaSimple
+# NGEN = 50  # eaSimple
 # NGEN = 400  # nsga3
 
 # Leme, 2012:
-# NGEN = 1000  # or 6000
+NGEN = 1000  # or 6000
 # NPOP = 200  # replaced by MU
 CXPB = 0.8
 MUTPB = 0.07
@@ -248,6 +248,7 @@ mstats.register("std", numpy.std, axis=0)
 mstats.register("min", numpy.min, axis=0)
 mstats.register("max", numpy.max, axis=0)
 
+# For testing, logbook and pop become global variables.
 logbook = tools.Logbook()
 
 # First group by the common `gen`, `nevals`, then group by chapters
@@ -255,6 +256,8 @@ logbook.header = "gen", "nevals", "fitness"
 logbook.chapters["fitness"].header = "avg", "std", "min", "max"
 
 pop = toolbox.population(n=MU)
+
+checkpoint = 50
 
 
 def main(seed=None):
@@ -269,6 +272,8 @@ def main(seed=None):
 
     random.seed(seed)
 
+    # TODO: implement checkpoints, to unpause ongoing optimization.
+    # def main(seed=None, gen=0):  # ...
     pop = toolbox.population(n=MU)
 
     invalid_ind = [ind for ind in pop if not ind.fitness.valid]
@@ -276,6 +281,12 @@ def main(seed=None):
 
     for ind, fit in zip(invalid_ind, fitnesses):
         ind.fitness.values = fit
+
+    logbook = tools.Logbook()
+
+    # First group by the common `gen`, `nevals`, then group by chapters
+    logbook.header = "gen", "nevals", "fitness"
+    logbook.chapters["fitness"].header = "avg", "std", "min", "max"
 
     record = mstats.compile(pop)
     logbook.record(gen=0, nevals=len(invalid_ind), **record)
@@ -295,8 +306,8 @@ def main(seed=None):
         # Select the next generation population from parents and offspring
         pop = toolbox.select(pop + offspring, MU)
 
-        # 8, 16, 24, 32, 40, 48.
-        if gen % 8 == 0:
+        # 50, 100, ..., 900, 950.
+        if gen % checkpoint == 0:
             with open((prefix + f"pop-gen_{gen}.pickle"), "wb") as f:
                 pickle.dump(pop, f, protocol=pickle.DEFAULT_PROTOCOL)
 
@@ -305,7 +316,7 @@ def main(seed=None):
         logbook.record(gen=gen, nevals=len(invalid_ind), **record)
         print(logbook.stream)
 
-        if gen % 8 == 0:
+        if gen % checkpoint == 0:
             with open((prefix + f"logbook-gen_{gen}.pickle"), "wb") as f:
                 pickle.dump(logbook, f, protocol=pickle.DEFAULT_PROTOCOL)
 
