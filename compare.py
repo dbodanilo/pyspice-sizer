@@ -17,8 +17,11 @@ def ratio_from_db(db):
     return 10 ** (db / 20)
 
 
-seed = 1241
-timestamp = "2024-05-17_02-31"
+seed_leme = 1241
+timestamp = "2024-05-17_10-55"
+model = "deap_nsga3-params_deb"
+seed_deap = 1241
+gen = None
 
 leme_data = pandas.read_csv("leme-fronteira.csv", delimiter="\t")
 
@@ -27,8 +30,8 @@ Y = leme_data[["N.", "Semente", "A_{v0}", "f_{T}", "Pwr", "SR", "Area"]]
 # set difference from Y's columns, except "N." and "Semente".
 X = leme_data.drop(columns=Y.columns.drop(["N.", "Semente"]))
 
-X_train = X[X["Semente"] == seed].drop(columns=["N.", "Semente"])
-Y_train = Y[Y["Semente"] == seed].drop(columns=["N.", "Semente"])
+X_train = X[X["Semente"] == seed_leme].drop(columns=["N.", "Semente"])
+Y_train = Y[Y["Semente"] == seed_leme].drop(columns=["N.", "Semente"])
 
 # I_{pol}: \micro\ampere;
 # V_{pol}: \volt;
@@ -70,8 +73,9 @@ Y_train_scaled_self_weighted = Y_train_scaled_self * y_weights
 
 ref_leme_scaled = numpy.max(Y_train_scaled_self_weighted, axis=0) + 1
 
-prefix = f"./out/single-stage-amp/{timestamp}_deap_nsga3-"
-with open((prefix + "pop.pickle"), "rb") as pop_file:
+prefix = f"./out/single-stage-amp/{timestamp}_{model}-seed_{seed_deap}-"
+fname = prefix + "pop" + ("" if gen is None else f"-gen_{gen}") + ".pickle"
+with open(fname, "rb") as pop_file:
     pop = pickle.load(pop_file)
 
 obj = pandas.DataFrame(
@@ -103,10 +107,12 @@ ref_deap_scaled = numpy.max(wobj_scaled_self, axis=0) + 1
 
 
 def main():
-    print("deap:", timestamp, "leme:", seed)
-    print("raw hv:")
-    print("leme:", hv.hypervolume(Y_train_weighted.to_numpy(), ref_leme.to_numpy()))
-    print("deap:", hv.hypervolume(wobj.to_numpy(), ref_deap.to_numpy()))
+    print("deap:", timestamp, model, seed_deap, gen, "leme:", seed_leme)
+
+    # TODO: reevaluate the relevance of raw hypervolume.
+    # print("raw hv:")
+    # print("leme:", hv.hypervolume(Y_train_weighted.to_numpy(), ref_leme.to_numpy()))
+    # print("deap:", hv.hypervolume(wobj.to_numpy(), ref_deap.to_numpy()))
 
     print("\nleme-scaled hv:")
     print("leme:", hv.hypervolume(
@@ -116,13 +122,15 @@ def main():
         wobj_scaled_leme.to_numpy(),
         ref_leme_scaled.to_numpy()))
 
-    print("\ndeap-scaled hv:")
-    print("leme:", hv.hypervolume(
-        Y_train_scaled_deap_weighted.to_numpy(),
-        ref_deap_scaled.to_numpy()))
-    print("deap:", hv.hypervolume(
-        wobj_scaled_self.to_numpy(),
-        ref_deap_scaled.to_numpy()))
+    # TODO: reevaluate the relevance of scaling the
+    # hypervolume to the deap result.
+    # print("\ndeap-scaled hv:")
+    # print("leme:", hv.hypervolume(
+    #     Y_train_scaled_deap_weighted.to_numpy(),
+    #     ref_deap_scaled.to_numpy()))
+    # print("deap:", hv.hypervolume(
+    #     wobj_scaled_self.to_numpy(),
+    #     ref_deap_scaled.to_numpy()))
 
 
 if __name__ == "__main__":
