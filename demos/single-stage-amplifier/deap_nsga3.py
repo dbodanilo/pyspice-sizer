@@ -58,7 +58,6 @@ P_M = 1.0/NDIM
 ETA_C = 30.0
 ETA_M = 20.0
 
-
 # Multiobjective
 # A_{v0}, f_T, Pwr, SR, Area
 NOBJ = 5
@@ -82,14 +81,14 @@ def area_key(individual):
     ws = individual[-len(WS):]
     assert len(ls) == len(ws)
 
+    for l, w in zip(ls, ws):
+        a += 2 * l * w
+
     # l_pairs = ls[:-2]
     l_singles = ls[-2:]
 
     # w_pairs = ws[:-2]
     w_singles = ws[-2:]
-
-    for l, w in zip(ls, ws):
-        a += 2 * l * w
 
     # reiterate over singles, as there are only two of them.
     for l, w in zip(l_singles, w_singles):
