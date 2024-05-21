@@ -2,6 +2,7 @@ import numpy
 import pandas
 import pickle
 
+from datetime import datetime
 from deap.tools._hypervolume import hv
 from math import log10
 from sklearn.metrics import r2_score
@@ -25,6 +26,9 @@ timestamp = "2024-05-17_10-55"
 model = "deap_nsga3-params_deb"
 seed_deap = seed_leme
 gen = None
+
+_now = datetime.now().strftime("%Y-%m-%d_%H-%M")
+print(_now)
 
 leme_data = pandas.read_csv("leme-fronteira.csv", delimiter="\t")
 
@@ -200,6 +204,9 @@ def main():
         print("raw:")
         print(Y_sim_r2)
         print("avg:", numpy.mean(Y_sim_r2))
+
+    _now = datetime.now().strftime("%Y-%m-%d_%H-%M")
+    print(_now)
 
 
 if __name__ == "__main__":
