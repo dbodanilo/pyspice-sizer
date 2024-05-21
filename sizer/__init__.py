@@ -28,8 +28,8 @@ class CircuitTemplate:
 
         self.parameters = set()
         for i in self.formatter.parse(self.netlist):
-            # cm, w, l.
-            if i[1] and (i[1][0] in "clw"):
+            # cm, ipol, l, vpol, w.
+            if i[1] and (i[1][0] in "cilvw"):
                 self.parameters.add(i[1])
 
         self.parameters = list(self.parameters)
@@ -77,7 +77,7 @@ class CircuitTemplateList(list):
         # this `sliceMap` is used later in `__call__`. Keys are each `circuitTemplate` object, and values are their own parameters' positions in this list's `self.parameters`. So later in `__call__`, one can use `parameters[self.sliceMap[circuit]]` to get the precise parameters that should be sent to each circuit object.
 
     def __call__(self, parameters):
-        return list(Circuit(i, parameters[self.sliceMap[i]]) for i in self)
+        return list(Circuit(i, dict((k, v) for (k, v) in parameters.items() if k in i.parameters)) for i in self)
 
 class Circuit:
     parser = SpiceParser(source=".title" + os.linesep + ".end") # 1.28 ms -> 65 us
@@ -104,7 +104,7 @@ class Circuit:
         self.parameters = parameters
 
         try:
-            mapping = parameters
+            mapping = dict((k, v) for (k, v) in parameters.items() if k in circuitTemplate.parameters)
 
             # NOTE: calculate source/drain perimeter and area.
             calculated = {}

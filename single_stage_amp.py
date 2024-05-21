@@ -1,7 +1,7 @@
 import numpy
 
 from deap import base, creator
-from sizer import CircuitTemplate
+from sizer import CircuitTemplate, CircuitTemplateList
 
 
 # ipol, vpol, l12, l34, l56, l78, l9, l10
@@ -58,31 +58,33 @@ def area_key(individual):
 
 def evaluate(individual):
     params = params_from_ind(individual)
-    circuit = circuitTemplate(params)
+    circuits = circuitTemplateList(params)
+    acCircuit = circuits[0]
+    tranCircuit = circuits[1]
 
     # TODO: look for a more elegant way than one try-except
     # for each circuit metric.
     # NOTE: Don't use a single try-except, as a good
     # performance in any single variable is worth keeping.
     try:
-        gain = numpy.absolute(circuit.gain)
+        gain = numpy.absolute(acCircuit.gain)
     except:
         gain = 0
 
     try:
         # bandwidth = circuit.bandwidth
-        bandwidth = circuit.unityGainFrequency
+        bandwidth = acCircuit.unityGainFrequency
     except:
         bandwidth = 0
 
     try:
-        power = circuit.staticPower
+        power = acCircuit.staticPower
     except:
         power = numpy.inf
 
     try:
         # TODO: evaluate the need for hints.
-        slew_rate = circuit.slewRate
+        slew_rate = tranCircuit.slewRate
     except:
         slew_rate = 0
 
@@ -107,8 +109,13 @@ for c in classes:
     if hasattr(creator, c):
         delattr(creator, c)
 
-with open("./demos/single-stage-amplifier/single-stage-amp.cir") as f:
-    circuitTemplate = CircuitTemplate(f.read())
+with open("./demos/single-stage-amplifier/single-stage-amp-ac.cir") as f:
+    acTemplate = CircuitTemplate(f.read())
+
+with open("./demos/single-stage-amplifier/single-stage-amp-tran.cir") as f:
+    tranTemplate = CircuitTemplate(f.read())
+
+circuitTemplateList = CircuitTemplateList((acTemplate, tranTemplate))
 
 # A_{v0}, f_T, Pwr, SR, Area
 creator.create("FitnessAmp", base.Fitness, weights=(1.0, 1.0, -1.0, 1.0, -1.0))

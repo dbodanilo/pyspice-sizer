@@ -1,0 +1,58 @@
+* OTA
+.include nmosmod.mod
+.include pmosmod.mod
+C1 Vo GND 3p
+
+I1 GND Ip dc={ipol}
+
+V0 VDD GND 3
+V1 Vp GND dc={vpol}
+V2 Vn Vp dc=0 acmag=1
+
+M1 n01 Vn n02 n02 nmosmod l={l12} w={w12}
++ ad={a12} as={a12}
++ pd={p12} ps={p12}
++ nrd={nr12} nrs={nr12}
+M2 n03 Vp n02 n02 nmosmod l={l12} w={w12}
++ ad={a12} as={a12}
++ pd={p12} ps={p12}
++ nrd={nr12} nrs={nr12}
+
+M3 n01 n01 VDD VDD pmosmod l={l34} w={w34}
++ ad={a34} as={a34}
++ pd={p34} ps={p34}
++ nrd={nr34} nrs={nr34}
+M4 n03 n03 VDD VDD pmosmod l={l34} w={w34}
++ ad={a34} as={a34}
++ pd={p34} ps={p34}
++ nrd={nr34} nrs={nr34}
+
+M5 n04 n01 VDD VDD pmosmod l={l56} w={w56}
++ ad={a56} as={a56}
++ pd={p56} ps={p56}
++ nrd={nr56} nrs={nr56}
+M6  Vo n04 VDD VDD pmosmod l={l56} w={w56}
++ ad={a56} as={a56}
++ pd={p56} ps={p56}
++ nrd={nr56} nrs={nr56}
+
+M7 n04 n04 GND GND nmosmod l={l78} w={w78}
++ ad={a78} as={a78}
++ pd={p78} ps={p78}
++ nrd={nr78} nrs={nr78}
+M8  Vo n04 GND GND nmosmod l={l78} w={w78}
++ ad={a78} as={a78}
++ pd={p78} ps={p78}
++ nrd={nr78} nrs={nr78}
+
+M9 Ip Ip GND GND nmosmod l={l9} w={w9}
++ ad={a9} as={a9}
++ pd={p9} ps={p9}
++ nrd={nr9} nrs={nr9}
+
+M10 n02 Ip GND GND nmosmod l={l10} w={w10}
++ ad={a10} as={a10}
++ pd={p10} ps={p10}
++ nrd={nr10} nrs={nr10}
+
+.end
