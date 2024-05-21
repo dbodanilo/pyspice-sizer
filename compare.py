@@ -82,6 +82,11 @@ fname = prefix + "pop" + ("" if gen is None else f"-gen_{gen}") + ".pickle"
 with open(fname, "rb") as pop_file:
     pop = pickle.load(pop_file)
 
+fitnesses_old = pandas.DataFrame(
+    [ind.fitness.values for ind in pop],
+    columns=Y_train.columns
+)
+
 # pickled pop already has fitness values, but evaluate() has
 # been updated.
 fitnesses = list(map(evaluate, pop))
