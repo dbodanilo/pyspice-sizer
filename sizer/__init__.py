@@ -129,18 +129,20 @@ class Circuit:
         self._circuit.raw_spice += self.circuitTemplate.rawSpice
         self._simulator = self._circuit.simulator(simulator="ngspice-subprocess")
 
-        self.hints = dict(
-            ac = dict(
-                start = 1,
-                end = 1e+9,
-                variation = "dec"
-            ),
-            tran = dict(
-                start = 0,
-                end = 1e-3,
-                points = 100
-            )
-        )
+        self.hints = {
+            "ac": {
+                "start": 5,
+                "end": 1e+9,
+                "points": 10,
+                "variation": "dec",
+            },
+            "tran": {
+                "start": 0,
+                "end": 25e-6,
+                "points": 100,
+                "step": 0.1e-6
+            },
+        }
 
         # self._cached = {}
 
@@ -186,18 +188,20 @@ class Circuit:
 
     # Methods for manual usage. They ignore `self.hints`.
     @functools.lru_cache()
-    def getTransientModel(self, start=0, end=1e-6, points=1000):
-        return self._simulator.transient(start_time=start, end_time=end, step_time=(end - start) / points)
+    def getTransientModel(self, start=0, end=1e-6, points=1000, step=None):
+        if step is None:
+            step = (end - start) / points
+        return self._simulator.transient(start_time=start, end_time=end, step_time=step)
 
     @functools.lru_cache()
-    def getTransientResponse(self, start=0, end=1e-6, points=1000):
-        analysis = self.getTransientModel(start, end, points)
+    def getTransientResponse(self, start=0, end=1e-6, points=1000, step=None):
+        analysis = self.getTransientModel(start, end, points, step)
         time = np.array(analysis.time)
 
         return (time, self.getResponse(analysis.nodes))
 
     @functools.lru_cache()
-    def getSmallSignalModel(self, start=1, end=1e+9, points=10, variation="dec"):
+    def getSmallSignalModel(self, start=5, end=1e+9, points=10, variation="dec"):
         """Do an AC small-signal simulation
 
         Attributes
@@ -221,8 +225,8 @@ class Circuit:
         """
         return self._simulator.ac(start_frequency=start, stop_frequency=end, number_of_points=points, variation=variation)
 
-    @functools.lru_cache() # This boosts performance...
-    def getFrequencyResponse(self, start=1, end=1e+9, points=10, variation="dec"):
+    @functools.lru_cache()  # This boosts performance...
+    def getFrequencyResponse(self, start=5, end=1e+9, points=10, variation="dec"):
         # analysis = self._simulator.ac(start_frequency=start, stop_frequency=end, number_of_points=points, variation=variation)
         analysis = self.getSmallSignalModel(start, end, points, variation)
         frequencies = np.array(analysis.frequency)
