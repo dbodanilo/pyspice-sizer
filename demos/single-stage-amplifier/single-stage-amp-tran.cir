@@ -7,10 +7,10 @@ I1 GND Ip dc={ipol}
 
 V0 VDD GND 3
 
-V1 Vp GND dc=0 pulse=(0.0 2.0 5u 1p)
+V1 Vp GND dc=0 pulse(0.0 2.0 5u 1p)
 
-V2 upr GND pwl=(0 0.20  4.99u 0.20  5.00u 3.0 25u 3.0)
-V3 lwr GND pwl=(0 0.00 20.00u 0.00 20.01u 1.6 25u 1.6)
+V2 upr GND dc=0 pwl(0 0.20  4.99u 0.20  5.00u 3.0 25u 3.0)
+V3 lwr GND dc=0 pwl(0 0.00 20.00u 0.00 20.01u 1.6 25u 1.6)
 
 R1 Vo Vn 0.001
 
