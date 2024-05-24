@@ -130,16 +130,26 @@ class Circuit:
         self._simulator = self._circuit.simulator(simulator="ngspice-subprocess")
 
         self.hints = {
+            # NOTE, SPICE syntax for AC analysis:
+            # .ac dec nd fstart fstop
+            # https://ngspice.sourceforge.io/docs/ngspice-html-manual/manual.xhtml#subsec__AC__Small_Signal_AC
+            # Leme, 2012:
+            # ac dec 5 10 1g
             "ac": {
-                "start": 5,
+                "start": 10,
                 "end": 1e+9,
-                "points": 10,
+                "points": 5,
                 "variation": "dec",
             },
+            # NOTE, SPICE syntax for TRAN analysis:
+            # .tran tstep tstop <tstart <tmax>> <uic>
+            # https://ngspice.sourceforge.io/docs/ngspice-html-manual/manual.xhtml#subsec__TRAN__Transient_Analysis
+            # Leme, 2012:
+            # tran 0.1us 25us
             "tran": {
                 "start": 0,
                 "end": 25e-6,
-                "points": 100,
+                "points": None,  # use tstep directly.
                 "step": 0.1e-6
             },
         }
@@ -188,20 +198,29 @@ class Circuit:
 
     # Methods for manual usage. They ignore `self.hints`.
     @functools.lru_cache()
-    def getTransientModel(self, start=0, end=1e-6, points=1000, step=None):
+    def getTransientModel(self, start=None, end=None, points=None, step=None):
+        # start might be 0.
+        start = start if start is not None else self.hints["tran"]["start"]
+
+        # NOTE: will ignore if any of those is set to 0,
+        # but it wouldn't make sense to have any of them as 0 either.
+        end = end or self.hints["tran"]["end"]
+        points = points or self.hints["tran"]["points"]
+        step = step or self.hints["tran"]["step"]
+
         if step is None:
             step = (end - start) / points
         return self._simulator.transient(start_time=start, end_time=end, step_time=step)
 
     @functools.lru_cache()
-    def getTransientResponse(self, start=0, end=1e-6, points=1000, step=None):
+    def getTransientResponse(self, start=None, end=None, points=None, step=None):
         analysis = self.getTransientModel(start, end, points, step)
         time = np.array(analysis.time)
 
         return (time, self.getResponse(analysis.nodes))
 
     @functools.lru_cache()
-    def getSmallSignalModel(self, start=5, end=1e+9, points=10, variation="dec"):
+    def getSmallSignalModel(self, start=None, end=None, points=None, variation=None):
         """Do an AC small-signal simulation
 
         Attributes
@@ -223,10 +242,16 @@ class Circuit:
 
         analysis : PySpice analysis object
         """
+        # NOTE: will ignore if any of those is set to 0,
+        # but it wouldn't make sense to have any of them as 0 either.
+        start = start or self.hints["ac"]["start"]
+        end = end or self.hints["ac"]["end"]
+        points = points or self.hints["ac"]["points"]
+        variation = variation or self.hints["ac"]["variation"]
         return self._simulator.ac(start_frequency=start, stop_frequency=end, number_of_points=points, variation=variation)
 
     @functools.lru_cache()  # This boosts performance...
-    def getFrequencyResponse(self, start=5, end=1e+9, points=10, variation="dec"):
+    def getFrequencyResponse(self, start=None, end=None, points=None, variation=None):
         # analysis = self._simulator.ac(start_frequency=start, stop_frequency=end, number_of_points=points, variation=variation)
         analysis = self.getSmallSignalModel(start, end, points, variation)
         frequencies = np.array(analysis.frequency)
