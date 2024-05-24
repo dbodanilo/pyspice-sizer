@@ -22,7 +22,7 @@ def bandwidthLoss(circuit):
     try:
         return np.maximum(0, (5e+3 - circuit.unityGainFrequency) / 5e+3) ** 2
     except:
-        print("bandwidth undefined")
+        print("unityGainFrequency undefined")
         return 1
 
 
