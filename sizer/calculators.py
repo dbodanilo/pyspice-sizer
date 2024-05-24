@@ -4,6 +4,9 @@ import numpy as np
 
 import functools
 
+from math import copysign
+
+
 class CalculationError(Exception):
     pass
 
@@ -74,15 +77,65 @@ def unityGainFrequency(frequenciesInHertz, frequencyResponse, initialGuess=1e+3)
     """
     amplitudeResponse = np.abs(frequencyResponse)
     try:
-        firstBelowUnityIndex = np.min(np.where(amplitudeResponse < 1))
+        # firstBelowUnityIndex = np.min(np.where(amplitudeResponse < 1))
+
         # amplitudeResponseInterpolated = scipy.interpolate.interp1d(frequenciesInHertz[firstBelowUnityIndex - 1: firstBelowUnityIndex + 1], amplitudeResponse[firstBelowUnityIndex - 1: firstBelowUnityIndex + 1], bounds_error=False)
         # amplitudeResponseInterpolated = scipy.interpolate.interp1d(frequenciesInHertz, amplitudeResponse, bounds_error=False)
-        return scipy.optimize.root(lambda x: np.interp(x, \
-        frequenciesInHertz[firstBelowUnityIndex - 1: firstBelowUnityIndex + 1], \
-        amplitudeResponse[firstBelowUnityIndex - 1: firstBelowUnityIndex + 1], \
-        left=np.nan, right=np.nan) - 1, frequenciesInHertz[firstBelowUnityIndex - 1]).x[0]
+
+        # return scipy.optimize.root(lambda x: np.interp(x, \
+        # frequenciesInHertz[firstBelowUnityIndex - 1: firstBelowUnityIndex + 1], \
+        # amplitudeResponse[firstBelowUnityIndex - 1: firstBelowUnityIndex + 1], \
+        # left=np.nan, right=np.nan) - 1, frequenciesInHertz[firstBelowUnityIndex - 1]).x[0]
+
+        # closest amplitude to 1.
+        # let cur = 0
+        # cursor cur right gainvec 1
+        i = np.argmin(abs(amplitudeResponse - 1))
+
+        # local region:
+        # [i - 1, i, i + 1]
+        xp = amplitudeResponse[i - 1:i + 2]
+        fp = frequenciesInHertz[i - 1:i + 2]
+
+        diff_x = np.diff(xp)
+
+        # xp must be monotonic.
+        assert copysign(diff_x[0], diff_x[-1]) == diff_x[0]
+
+        # xp must be increasing.
+        xp = np.copysign(xp, diff_x[0])
+        # unity gain turns to -1 when amplitude decreases.
+        x = np.copysign(1, diff_x[0])
+
+        # return 0 when out of bounds
+        # (x < xp[0] or x > xp[-1]).
+        # let fT = real(frequency[%cur])
+        return np.interp(x, xp, fp, left=0, right=0)
     except:
-        raise CalculationError("impossible to calculate the unity gain frequency, because the data contains no amplitude point that is less than or equals 1. Try simulating with wider frequency range, or this circuit does not reach unity gain at all.")
+        i_max = np.argmax(amplitudeResponse)
+        a_max = amplitudeResponse[i_max]
+        i_min = np.argmin(amplitudeResponse)
+        a_min = amplitudeResponse[i_min]
+
+        # circuit does not reach unity gain at all.
+        if a_max < 1:
+            i, name = i_max, "max"
+        # unity gain is possibly out of bounds.
+        elif a_min > 1:
+            i, name = i_min, "min"
+        # a_min <= 1 and a_max >= 1, should not raise error.
+        else:
+            # TODO: investigate.
+            # print("frequencies:", frequenciesInHertz)
+            # print("amplitudes:", amplitudeResponse)
+
+            name = "argmin"
+
+        print(f"closest amplitude ({name}):", amplitudeResponse[i], end=", ")
+        print("frequency:", frequenciesInHertz[i])
+
+        return 0
+        # raise CalculationError("impossible to calculate the unity gain frequency, because the data contains no amplitude point that is less than or equals 1. Try simulating with wider frequency range, or this circuit does not reach unity gain at all.")
 
 def positiveFeedbackFrequency(frequenciesInHertz, frequencyResponse, initialGuess=1e+3):
     """Calculate the frequency in Hertz at which the phase drops to -180deg.
@@ -151,14 +204,19 @@ def gainMargin(frequenciesInHertz, frequencyResponse):
     return 1 - np.interp(positiveFeedbackFrequency(frequenciesInHertz, frequencyResponse), frequenciesInHertz, amplitudeResponse)
 
 def gain(frequenciesInHertz, frequencyResponse):
-    """Calculate the gain at 1 Hz, return as a complex number
+    """Calculate the gain at `start` Hz, return as a complex number
     """
     try:
         # return scipy.interpolate.interp1d(frequenciesInHertz, frequencyResponse)(1)
-        return np.interp(1, frequenciesInHertz, frequencyResponse)
-    except:
-        raise CalculationError("impossible to calculate the DC gain because the data does not contain gain at 1 Hz.")
+        # return np.interp(1, frequenciesInHertz, frequencyResponse)
 
+        # NOTE: Leme, 2012:
+        # let av0 = gainvec[0]
+        return frequencyResponse[0]
+    except:
+        raise CalculationError("impossible to calculate the DC gain because the data does not contain gain at {} Hz.".format(frequenciesInHertz[0]))
+
+# TODO: update Slew Rate calculator.
 def slewRate(timeInSecond, wave):
     r"""Calculate the slew rate by naive definition
 
