@@ -62,34 +62,64 @@ def evaluate(individual):
     acCircuit = circuits[0]
     tranCircuit = circuits[1]
 
+    # NOTE, SPICE syntax for AC analysis:
+    # .ac dec nd fstart fstop
+    # https://ngspice.sourceforge.io/docs/ngspice-html-manual/manual.xhtml#subsec__AC__Small_Signal_AC
+    # Same hints as in Leme, 2012:
+    # ac dec 5 10 1g
+    acCircuit.hints["ac"]["variation"] = "dec"
+    acCircuit.hints["ac"]["points"] = 5
+    acCircuit.hints["ac"]["start"] = 10
+    acCircuit.hints["ac"]["end"] = 1e9
+
+    # NOTE, SPICE syntax for TRAN analysis:
+    # .tran tstep tstop
+    # https://ngspice.sourceforge.io/docs/ngspice-html-manual/manual.xhtml#subsec__TRAN__Transient_Analysis
+    # Leme, 2012:
+    # tran 0.1us 25us
+    tranCircuit.hints["tran"]["step"] = 0.1e-6
+    tranCircuit.hints["tran"]["end"] = 25e-6
+
     # TODO: look for a more elegant way than one try-except
     # for each circuit metric.
     # NOTE: Don't use a single try-except, as a good
     # performance in any single variable is worth keeping.
+    errors = set()
     try:
         gain = numpy.absolute(acCircuit.gain)
     except:
         gain = 0
+        errors.add("gain")
 
     try:
         # bandwidth = circuit.bandwidth
         bandwidth = acCircuit.unityGainFrequency
     except:
         bandwidth = 0
+        errors.add("unityGainFrequency")
 
+    # NOTE: staticPower (i.e., OP analysis) should not throw
     try:
         power = acCircuit.staticPower
     except:
         power = numpy.inf
+        errors.add("staticPower")
+
 
     try:
-        # TODO: evaluate the need for hints.
         slew_rate = tranCircuit.slewRate
     except:
         slew_rate = 0
+        errors.add("slewRate")
 
     # NOTE: area doesn't throw exceptions.
     area = area_key(individual)
+
+    if len(errors) > 0:
+        for name in errors:
+            print(name, "undefined", end=", ")
+
+        print("")
 
     return gain, bandwidth, power, slew_rate, area
 
