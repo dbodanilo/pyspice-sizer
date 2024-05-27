@@ -217,7 +217,7 @@ def gain(frequenciesInHertz, frequencyResponse):
         raise CalculationError("impossible to calculate the DC gain because the data does not contain gain at {} Hz.".format(frequenciesInHertz[0]))
 
 # TODO: update Slew Rate calculator.
-def slewRate(timeInSecond, wave):
+def slewRate(timeInSecond, wave, lwr, upr):
     r"""Calculate the slew rate by naive definition
 
     Notes
@@ -231,7 +231,56 @@ def slewRate(timeInSecond, wave):
     
     However, in some context, slew rate means the 2 thresholds (often 10% of delta and 90% of delta) divided by the time it takes the wave to rise from the low threshold to the high threshold. For example, consider a wave that travels from 1 V to 2 V. The slew rate is sometimes considered as (1.9 - 1.1) divided by the time it takes the wave to go up from 1.1 V to 1.9 V. If the duration is 1 s, then slew rate is 0.8/1 = 0.8 V/s.
     """
-    return np.max(np.abs(np.diff(wave) / np.diff(timeInSecond)))
+    # naive definition (possibly unstable)
+    # return np.max(np.abs(np.diff(wave) / np.diff(timeInSecond)))
+
+    # let tupr = v(4) gt v(upr)
+    t_upr = wave > upr
+    # let tlwr = v(4) lt v(lwr)
+    t_lwr = wave < lwr
+    # if (tupr | tlwr)
+    if any(t_upr | t_lwr):
+        # let st = -sum(abs(v(4) * tupr) + abs(v(4) * tlwr)) * 1e6
+        sr = -np.sum(np.abs(wave * t_upr) + np.abs(wave * t_lwr)) * 1e6
+    else:
+        out10 = 0.3
+        out90 = 1.5
+
+        # closest wave value to out10
+        i10 = np.argmin(abs(wave - out10))
+        # closest wave value to out90
+        i90 = np.argmin(abs(wave - out10))
+
+        # local region
+        # [i10 - 1, i10, i10 + 1]
+        fp10 = wave[i10 - 1:i10 + 2]
+        fp90 = wave[i90 - 1:i90 + 2]
+
+        xp10 = range(np.max(i10 - 1, 0), np.min(i10 + 2, len(wave)))
+        xp90 = range(np.max(i90 - 1, 0), np.min(i90 + 2, len(wave)))
+
+        t10 = timeInSecond[i10 - 1:i10 + 2]
+        t90 = timeInSecond[i90 - 1:i90 + 2]
+
+        # real-valued indices
+        # cursor c1 right V(4) out10
+        i10 = np.interp(out10, xp10, fp10)
+        # cursor c2 right V(4) out90
+        i90 = np.interp(out90, xp90, fp90)
+
+        # time[%c1]
+        t10 = np.interp(i10, xp10, t10)
+        # time[%c2]
+        t90 = np.interp(i90, xp90, t90)
+
+        # let sr = (out90 - out10) / (time[%c2] - time[%c1])
+        # TODO: use interpolated wave[i90] - wave[i10] values,
+        # to prevent misleading results when interpolation fails;
+        # even return 0 if the thresholds are not met.
+        sr = (out90 - out10)/(t90 - t10)
+
+    return sr
+
 
 def risingTime(timeInSecond, wave, threshold1=None, threshold2=None):
     """Measure the time it takes the wave to increase from `threshold1` to `threshold2` for the first time.

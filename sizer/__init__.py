@@ -326,4 +326,7 @@ class Circuit:
     @property
     def slewRate(self):
         analysis = self.getTransientModel(**self.hints["tran"])
-        return sizer.calculators.slewRate(np.array(analysis.time), np.array(self.getOutput(analysis.nodes)))
+        v_out = np.array(self.getOutput(analysis.nodes))
+        v_lwr = np.array(analysis.nodes["lwr"])
+        v_upr = np.array(analysis.nodes["upr"])
+        return sizer.calculators.slewRate(np.array(analysis.time), v_out, v_lwr, v_upr)
