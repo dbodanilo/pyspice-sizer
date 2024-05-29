@@ -4,7 +4,7 @@ import numpy as np
 
 import functools
 
-from math import copysign
+from math import ceil, copysign, floor
 
 
 class CalculationError(Exception):
@@ -206,6 +206,91 @@ def gain(frequenciesInHertz, frequencyResponse):
         return frequencyResponse[0]
     except:
         raise CalculationError("impossible to calculate the DC gain because the data does not contain gain at {} Hz.".format(frequenciesInHertz[0]))
+
+
+# NOTE: updated Slew Rate calculator.
+def slewRate(timeInSecond, wave):
+    r"""Calculate the slew rate by Moreto, 2024-05-23's definition.
+
+    Notes
+    -----
+
+    SPICE code:
+
+    let c1=0
+    cursor c1 right time 12.5u
+    let out1=v(out)[%c1]
+
+    let c2=0
+    cursor c2 right time 17.5u
+    let out2=v(out)[%c2]
+
+    let p10=(out2-out1)/10
+    let out10=out1+p10
+    let out90=out2-p10
+
+    let c1=0
+    let c2=0
+    let srr_v_us=0
+
+    * Move cursor c1 to 10% of v(out) level at third edge
+    * (beginning of the second pulse cycle)
+    cursor c1 right v(out) out10 3
+    * Move cursor c2 to 90% of v(out) level at third edge
+    * (beginning of the second pulse cycle)
+    cursor c2 right v(out) out90 3
+
+    let trise=(time[%c2]-time[%c1])*1E6
+
+    if trise ne 0
+        srr_v_us=(out90-out10)/trise
+    end
+    """
+    # TODO: get it from the second pulse
+    # (will need to change the pulse as well):
+    # t_lwr = 12.5e-6
+    # t_upr = 17.5e-6
+
+    # pulse(0.0 2.0 5u 1p)
+    # tran  0.1us 25us
+    t_lwr = 2.5e-6
+    t_upr = 22.5e-6
+
+    sr = 0
+
+    try:
+        i_lwr = floatCursorRight(timeInSecond, t_lwr)
+        i_upr = floatCursorRight(timeInSecond, t_upr)
+
+        out1 = floatCursorGet(wave, i_lwr)
+        out2 = floatCursorGet(wave, i_upr)
+
+        p10 = (out2 - out1) / 10
+        out10 = out1 + p10
+        out90 = out2 - p10
+
+        i10 = floatCursorRight(wave, out10)
+        i90 = floatCursorRight(wave, out90)
+
+        # NOTE: use interpolated wave[i90] - wave[i10] values,
+        # to prevent misleading results when interpolation fails;
+        # in case the amplitude never reaches the thresholds.
+        out10 = floatCursorGet(wave, i10)
+        out90 = floatCursorGet(wave, i90)
+
+        t10 = floatCursorGet(timeInSecond, i10)
+        t90 = floatCursorGet(timeInSecond, i90)
+
+        trise = t90 - t10
+        assert trise > 0
+        sr = (out90 - out10) / trise
+    except:
+        print("time:", timeInSecond, end=", ")
+        print("wave:", wave)
+        input("Press Enter to continue...")
+
+    return sr
+
 
 # NOTE: naive definition (possibly unstable)
 def slewRateNaive(timeInSecond, wave):

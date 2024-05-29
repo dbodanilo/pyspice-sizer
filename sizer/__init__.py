@@ -135,10 +135,12 @@ class Circuit:
             # https://ngspice.sourceforge.io/docs/ngspice-html-manual/manual.xhtml#subsec__AC__Small_Signal_AC
             # Leme, 2012:
             # ac dec 5 10 1g
+            # Moreto, 2024-05-23:
+            # ac dec 10 1 10g
             "ac": {
-                "start": 10,
-                "end": 1e+9,
-                "points": 5,
+                "start": 1,
+                "end": 10e9,
+                "points": 10,
                 "variation": "dec",
             },
             # NOTE, SPICE syntax for TRAN analysis:
@@ -146,11 +148,13 @@ class Circuit:
             # https://ngspice.sourceforge.io/docs/ngspice-html-manual/manual.xhtml#subsec__TRAN__Transient_Analysis
             # Leme, 2012:
             # tran 0.1us 25us
+            # Moreto, 2024-05-23:
+            # tran 50n 25u
             "tran": {
                 "start": 0,
                 "end": 25e-6,
                 "points": None,  # use tstep directly.
-                "step": 0.1e-6
+                "step": 50e-9,
             },
         }
 
@@ -329,4 +333,5 @@ class Circuit:
         v_out = np.array(self.getOutput(analysis.nodes))
         v_lwr = np.array(analysis.nodes["lwr"])
         v_upr = np.array(analysis.nodes["upr"])
-        return sizer.calculators.slewRate(np.array(analysis.time), v_out, v_lwr, v_upr)
+        # return sizer.calculators.slewRateLeme(np.array(analysis.time), v_out, v_lwr, v_upr)
+        return sizer.calculators.slewRate(np.array(analysis.time), v_out)
