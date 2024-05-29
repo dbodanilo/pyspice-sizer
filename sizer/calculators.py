@@ -74,44 +74,20 @@ def unityGainFrequency(frequenciesInHertz, frequencyResponse, initialGuess=1e+3)
         Initial guess `x0` for the root finder. Providing reasonable and highly likely initial guess can speed up root finding.
 
     Frequency response is first interpolated with linear B-spline and then sent to a root finder.
+
+    Notes
+    -----
+
+    SPICE code:
+
+        let cur = 0
+        cursor cur right gainvec 1
+        let fT = real(frequency[%cur])
     """
     amplitudeResponse = np.abs(frequencyResponse)
     try:
-        # firstBelowUnityIndex = np.min(np.where(amplitudeResponse < 1))
-
-        # amplitudeResponseInterpolated = scipy.interpolate.interp1d(frequenciesInHertz[firstBelowUnityIndex - 1: firstBelowUnityIndex + 1], amplitudeResponse[firstBelowUnityIndex - 1: firstBelowUnityIndex + 1], bounds_error=False)
-        # amplitudeResponseInterpolated = scipy.interpolate.interp1d(frequenciesInHertz, amplitudeResponse, bounds_error=False)
-
-        # return scipy.optimize.root(lambda x: np.interp(x, \
-        # frequenciesInHertz[firstBelowUnityIndex - 1: firstBelowUnityIndex + 1], \
-        # amplitudeResponse[firstBelowUnityIndex - 1: firstBelowUnityIndex + 1], \
-        # left=np.nan, right=np.nan) - 1, frequenciesInHertz[firstBelowUnityIndex - 1]).x[0]
-
         # closest amplitude to 1.
-        # let cur = 0
-        # cursor cur right gainvec 1
         i = np.argmin(abs(amplitudeResponse - 1))
-
-        # local region:
-        # [i - 1, i, i + 1]
-        xp = amplitudeResponse[i - 1:i + 2]
-        fp = frequenciesInHertz[i - 1:i + 2]
-
-        diff_x = np.diff(xp)
-
-        # xp must be monotonic.
-        assert copysign(diff_x[0], diff_x[-1]) == diff_x[0]
-
-        # xp must be increasing.
-        xp = np.copysign(xp, diff_x[0])
-        # unity gain turns to -1 when amplitude decreases.
-        x = np.copysign(1, diff_x[0])
-
-        # return 0 when out of bounds
-        # (x < xp[0] or x > xp[-1]).
-        # let fT = real(frequency[%cur])
-        return np.interp(x, xp, fp, left=0, right=0)
-    except:
         i_max = np.argmax(amplitudeResponse)
         a_max = amplitudeResponse[i_max]
         i_min = np.argmin(amplitudeResponse)
@@ -131,12 +107,27 @@ def unityGainFrequency(frequenciesInHertz, frequencyResponse, initialGuess=1e+3)
 
             name = "argmin"
 
-        print(f"closest amplitude ({name}):", amplitudeResponse[i], end=", ")
-        print("frequency:", frequenciesInHertz[i])
+        # Otherwise the circuit does not reach unity gain.
+        assert a_min <= 1 and a_max >= 1
+    except:
+        a_i = amplitudeResponse[i]
 
-        return 0
-        # raise CalculationError("impossible to calculate the unity gain frequency, because the data contains no amplitude point that is less than or equals 1. Try simulating with wider frequency range, or this circuit does not reach unity gain at all.")
+        print(f"closest amplitude ({name}): {a_i}", end=", ")
+        print(f"frequency: {frequenciesInHertz[i]}")
 
+        # TODO: try out narrower ranges
+        # (this one: (0.5, 1.5))
+        if round(a_i) == 1:
+            return frequenciesInHertz[i]
+        else:
+            return 0
+
+    # real-valued cursor with amplitude 1.
+    i = floatCursorRight(amplitudeResponse, 1)
+
+    f_i = floatCursorGet(frequenciesInHertz, i)
+
+    return f_i
 def positiveFeedbackFrequency(frequenciesInHertz, frequencyResponse, initialGuess=1e+3):
     """Calculate the frequency in Hertz at which the phase drops to -180deg.
 
@@ -333,3 +324,42 @@ def fallingTime(timeInSecond, wave, threshold1=None, threshold2=None):
     time1 = scipy.optimize.root(lambda x: interpolater1(x) - threshold1, timeInSecond[index1 - 1]).x[0]
     time2 = scipy.optimize.root(lambda x: interpolater2(x) - threshold2, timeInSecond[index2 - 1]).x[0]
     return time2 - time1
+
+
+def floatCursorRight(wave, target):
+    i = np.argmin(abs(wave - target))
+
+    # local region
+    i0 = max(i - 1, 0)
+    i1 = min(i + 2, len(wave))
+    xp = wave[i0:i1]
+    # indices
+    fp = range(i0, i1)
+
+    diff_x = np.diff(xp)
+
+    # xp must be monotonic.
+    assert copysign(diff_x[0], diff_x[-1]) == diff_x[0], f"i: {i}, xp: {xp}"
+
+    # xp must be increasing
+    xp = np.copysign(xp, diff_x[0])
+    # target inverts when xp was originally decreasing
+    target = copysign(target, diff_x[0])
+
+    return np.interp(target, xp, fp)
+
+
+# TODO: make sure this is better:
+# left=0, right=0
+# (return 0 when out of bounds, i.e.,
+# x < xp[0] or x > xp[-1])
+def floatCursorGet(wave, cursor, left=0, right=0):
+    i0 = floor(cursor)
+    i1 = ceil(cursor)
+
+    # local region
+    # [i0, i1]
+    fp = wave[i0:i1 + 1]
+    xp = range(max(i0, 0), min(i1 + 1, len(wave)))
+
+    return np.interp(cursor, xp, fp, left=left, right=right)
