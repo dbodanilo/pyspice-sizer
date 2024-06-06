@@ -55,19 +55,47 @@ def ratio_from_db(db):
     return 10 ** (db / 20)
 
 
-# seed <- [1241..1245]
-def main(seed=1241, prefix_dir="./out/single-stage-amp/", script="compare-metrics_leme"):
-    # seed_leme = 1242
+# seed_leme <- [1241..1245]
+def main(seed_leme=1241, prefix_dir="./out/single-stage-amp/", script="compare-metrics_leme", deap_path="deap_nsga3/2024-05-22_15-42_deap_nsga3-params_deb-seed_1241-pop.pickle"):
     _now = datetime.now().strftime("%Y-%m-%d_%H-%M")
-    print(_now, f"seed={seed}")
+    print(_now, f"seed={seed_leme}")
 
     os.makedirs(prefix_dir, exist_ok=True)
-    # TODO: update script details as needed, e.g., metrics.
-    script = f"{script}-seed_{seed}"
-    prefix = f"{prefix_dir}{_now}_{script}-"
 
-    X_train = X[X["Semente"] == seed].drop(columns=["N.", "Semente"])
-    Y_train = Y[Y["Semente"] == seed].drop(columns=["N.", "Semente"])
+    deap_path = prefix_dir + deap_path
+    with open(deap_path, "rb") as pop_file:
+        deap_pop = pickle.load(pop_file)
+
+    # pickled pop already has fitness values, but evaluate() has
+    # been updated.
+    Y_deap = list(map(evaluate, deap_pop))
+    for ind, fit in zip(deap_pop, Y_deap):
+        ind.fitness.values = fit
+
+    Y_deap = pandas.DataFrame(Y_deap, columns=targets)
+    Y_deap_weighted = pandas.DataFrame(
+        numpy.array([ind.fitness.wvalues for ind in deap_pop]) * -1,
+        columns=targets
+    )
+
+    ref_deap = numpy.max(Y_deap_weighted, axis=0) + 1
+
+    deap_scaler = MinMaxScaler()
+
+    Y_deap_scaled_deap = pandas.DataFrame(
+        deap_scaler.fit_transform(Y_deap),
+        columns=targets
+    )
+    Y_deap_scaled_deap_weighted = Y_deap_scaled_deap * y_weights
+
+    ref_deap_scaled_deap = numpy.max(Y_deap_scaled_deap_weighted, axis=0) + 1
+
+    # TODO: update script details as needed, e.g., metrics.
+    script = f"{script}-seed_{seed_leme}"
+    prefix = f"{prefix_dir}compare/{_now}_{script}-"
+
+    X_train = X[X["Semente"] == seed_leme].drop(columns=["N.", "Semente"])
+    Y_train = Y[Y["Semente"] == seed_leme].drop(columns=["N.", "Semente"])
 
     X_train *= x_prefixes
     Y_train *= y_prefixes
@@ -87,6 +115,18 @@ def main(seed=1241, prefix_dir="./out/single-stage-amp/", script="compare-metric
     Y_train_scaled_leme_weighted = Y_train_scaled_leme * y_weights
 
     ref_leme_scaled_leme = numpy.max(Y_train_scaled_leme_weighted, axis=0) + 1
+
+    Y_train_scaled_deap = pandas.DataFrame(
+        deap_scaler.transform(Y_train),
+        columns=targets
+    )
+    Y_train_scaled_deap_weighted = Y_train_scaled_deap * y_weights
+
+    Y_deap_scaled_leme = pandas.DataFrame(
+        leme_scaler.transform(Y_deap),
+        columns=targets
+    )
+    Y_deap_scaled_leme_weighted = Y_deap_scaled_leme * y_weights
 
     X_pop = X_train.apply(creator.Individual, axis=1)
     Y_sim = list(map(evaluate, X_pop))
@@ -120,6 +160,12 @@ def main(seed=1241, prefix_dir="./out/single-stage-amp/", script="compare-metric
         index=targets
     )
 
+    Y_sim_scaled_deap = pandas.DataFrame(
+        deap_scaler.transform(Y_sim),
+        columns=targets
+    )
+    Y_sim_scaled_deap_weighted = Y_sim_scaled_deap * y_weights
+
     Y_sim_scaled_leme = pandas.DataFrame(
         leme_scaler.transform(Y_sim),
         columns=targets
@@ -127,24 +173,50 @@ def main(seed=1241, prefix_dir="./out/single-stage-amp/", script="compare-metric
 
     Y_sim_scaled_leme_weighted = Y_sim_scaled_leme * y_weights
 
+    Y_deap_scaled_sim = pandas.DataFrame(
+        sim_scaler.transform(Y_deap),
+        columns=targets
+    )
+    Y_deap_scaled_sim_weighted = Y_deap_scaled_sim * y_weights
+
     Y_train_scaled_sim = pandas.DataFrame(
         sim_scaler.transform(Y_train),
         columns=targets
     )
-
     Y_train_scaled_sim_weighted = Y_train_scaled_sim * y_weights
 
     # print("deap:", timestamp, model, seed_deap, gen, "leme:", seed_leme)
-    print("\nseed:", seed)
+    print("\nseed:", seed_leme)
 
     # TODO: reevaluate the relevance of raw hypervolume.
     print("raw hv:")
+    print("deap:", hv.hypervolume(Y_deap_weighted.to_numpy(), ref_deap.to_numpy()))
     print("leme:", hv.hypervolume(Y_train_weighted.to_numpy(), ref_leme.to_numpy()))
     print("simulated:", hv.hypervolume(
         Y_sim_weighted.to_numpy(), ref_sim.to_numpy()
     ))
 
+    # TODO: reevaluate the relevance of scaling the
+    # hypervolume to the deap result.
+    print("\ndeap-scaled hv:")
+    print("deap:", hv.hypervolume(
+        Y_deap_scaled_deap_weighted.to_numpy(),
+        ref_deap_scaled_deap.to_numpy()
+    ))
+    print("leme:", hv.hypervolume(
+        Y_train_scaled_deap_weighted.to_numpy(),
+        ref_deap_scaled_deap.to_numpy()
+    ))
+    print("simulated:", hv.hypervolume(
+        Y_sim_scaled_deap_weighted.to_numpy(),
+        ref_deap_scaled_deap.to_numpy()
+    ))
+
     print("\nleme-scaled hv:")
+    print("deap:", hv.hypervolume(
+        Y_deap_scaled_leme_weighted.to_numpy(),
+        ref_leme_scaled_leme.to_numpy()
+    ))
     print("leme:", hv.hypervolume(
         Y_train_scaled_leme_weighted.to_numpy(),
         ref_leme_scaled_leme.to_numpy()
@@ -155,6 +227,10 @@ def main(seed=1241, prefix_dir="./out/single-stage-amp/", script="compare-metric
     ))
 
     print("\nsim-scaled hv:")
+    print("deap:", hv.hypervolume(
+        Y_deap_scaled_sim_weighted.to_numpy(),
+        ref_sim_scaled_sim.to_numpy()
+    ))
     print("leme:", hv.hypervolume(
         Y_train_scaled_sim_weighted.to_numpy(),
         ref_sim_scaled_sim.to_numpy()
@@ -173,6 +249,8 @@ def main(seed=1241, prefix_dir="./out/single-stage-amp/", script="compare-metric
         print(Y_sim_r2)
         print("avg:", numpy.mean(Y_sim_r2))
 
+    # TODO: plot some view of the Pareto frontiers as well.
+
     _now = datetime.now().strftime("%Y-%m-%d_%H-%M")
     print(_now)
 
@@ -187,18 +265,30 @@ if __name__ == "__main__":
 
     script = f"compare-metrics_leme"
 
-    for seed in range(1241, 1246):
+    deap_paths = [
+        "deap_nsga3/2024-05-22_15-42_deap_nsga3-params_deb-seed_1241-pop.pickle",
+        "deap_nsga3/2024-05-22_15-58_deap_nsga3-params_deb-seed_1242-pop.pickle",
+        "deap_nsga3/2024-05-22_16-14_deap_nsga3-params_deb-seed_1243-pop.pickle",
+        "deap_nsga3/2024-05-22_16-32_deap_nsga3-params_deb-seed_1244-pop.pickle",
+        "deap_nsga3/2024-05-22_16-51_deap_nsga3-params_deb-seed_1245-pop.pickle",
+    ]
+
+    leme_seeds = range(1241, 1246)
+
+    seeds_paths = list(zip(leme_seeds, deap_paths))
+
+    for seed, path in seeds_paths:
         _now = datetime.now().strftime("%Y-%m-%d_%H-%M")
         print(_now, "seed:", seed)
 
-        prefix = f"{prefix_dir}{_now}_{script}-seed_{seed}-"
+        prefix = f"{prefix_dir}compare/{_now}_{script}-seed_{seed}-"
 
         with open((prefix + "run.log"), "a") as run_log:
             sys.stdout = run_log
 
             # Make them global, so they're available for interactive use.
             X_train, X_pop, Y_train, Y_sim = main(
-                seed=seed, prefix_dir=prefix_dir, script=script)
+                seed_leme=seed, prefix_dir=prefix_dir, script=script, deap_path=path)
 
             sys.stdout = stdout
 
