@@ -104,7 +104,16 @@ def main(seed=1241, prefix_dir="./out/single-stage-amp/", script="compare-metric
         columns=targets
     )
 
-    ref_leme_sim = numpy.max(Y_sim_weighted, axis=0) + 1
+    ref_sim = numpy.max(Y_sim_weighted, axis=0) + 1
+
+    sim_scaler = MinMaxScaler()
+
+    Y_sim_scaled_sim = pandas.DataFrame(
+        sim_scaler.fit_transform(Y_sim), columns=targets)
+
+    Y_sim_scaled_sim_weighted = Y_sim_scaled_sim * y_weights
+
+    ref_sim_scaled_sim = numpy.max(Y_sim_scaled_sim_weighted, axis=0) + 1
 
     Y_sim_r2 = pandas.Series(
         r2_score(Y_train, Y_sim, multioutput="raw_values"),
@@ -118,6 +127,13 @@ def main(seed=1241, prefix_dir="./out/single-stage-amp/", script="compare-metric
 
     Y_sim_scaled_leme_weighted = Y_sim_scaled_leme * y_weights
 
+    Y_train_scaled_sim = pandas.DataFrame(
+        sim_scaler.transform(Y_train),
+        columns=targets
+    )
+
+    Y_train_scaled_sim_weighted = Y_train_scaled_sim * y_weights
+
     # print("deap:", timestamp, model, seed_deap, gen, "leme:", seed_leme)
     print("\nseed:", seed)
 
@@ -125,7 +141,7 @@ def main(seed=1241, prefix_dir="./out/single-stage-amp/", script="compare-metric
     print("raw hv:")
     print("leme:", hv.hypervolume(Y_train_weighted.to_numpy(), ref_leme.to_numpy()))
     print("simulated:", hv.hypervolume(
-        Y_sim_weighted.to_numpy(), ref_leme_sim.to_numpy()
+        Y_sim_weighted.to_numpy(), ref_sim.to_numpy()
     ))
 
     print("\nleme-scaled hv:")
@@ -138,10 +154,20 @@ def main(seed=1241, prefix_dir="./out/single-stage-amp/", script="compare-metric
         ref_leme_scaled_leme.to_numpy()
     ))
 
+    print("\nsim-scaled hv:")
+    print("leme:", hv.hypervolume(
+        Y_train_scaled_sim_weighted.to_numpy(),
+        ref_sim_scaled_sim.to_numpy()
+    ))
+    print("simulated:", hv.hypervolume(
+        Y_sim_scaled_sim_weighted.to_numpy(),
+        ref_sim_scaled_sim.to_numpy()
+    ))
+
     # if seed_deap == seed_leme:
     if True:
         # NOTE: print accurate information.
-        print("[SR positive; f_T non-zero, except]")
+        print("[python calc]")
         print("simulation score:")
         print("raw:")
         print(Y_sim_r2)
