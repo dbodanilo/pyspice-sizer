@@ -178,6 +178,7 @@ def main(seed=1241, prefix_dir="./out/single-stage-amp/", script="compare-metric
 
     return X_train, X_pop, Y_train, Y_sim
 
+
 if __name__ == "__main__":
     stdout = sys.stdout
 
