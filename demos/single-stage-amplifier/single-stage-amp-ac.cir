@@ -31,7 +31,7 @@ M5 n04 n01 VDD VDD pmosmod l={l56} w={w56}
 + ad={a56} as={a56}
 + pd={p56} ps={p56}
 + nrd={nr56} nrs={nr56}
-M6  Vo n04 VDD VDD pmosmod l={l56} w={w56}
+M6  Vo n03 VDD VDD pmosmod l={l56} w={w56}
 + ad={a56} as={a56}
 + pd={p56} ps={p56}
 + nrd={nr56} nrs={nr56}
