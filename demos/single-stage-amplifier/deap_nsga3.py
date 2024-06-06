@@ -9,7 +9,7 @@ from deap import algorithms, base, creator, tools
 from math import comb
 from matplotlib import pyplot
 from multiprocessing import Pool
-from sizer import CircuitTemplate
+from sizer import CircuitTemplate, CircuitTemplateList
 
 
 _PLOT = True
@@ -100,10 +100,20 @@ def area_key(individual):
 # TODO: avoid keys that instantiate a new circuit.
 def bandwidth_key(individual):
     params = params_from_ind(individual)
-    circuit = circuitTemplate(params)
+    acCircuit = acTemplate(params)
+
+    # NOTE, SPICE syntax for AC analysis:
+    # .ac dec nd fstart fstop
+    # https://ngspice.sourceforge.io/docs/ngspice-html-manual/manual.xhtml#subsec__AC__Small_Signal_AC
+    # Same hints as in Leme, 2012:
+    # ac dec 5 10 1g
+    acCircuit.hints["ac"]["variation"] = "dec"
+    acCircuit.hints["ac"]["points"] = 5
+    acCircuit.hints["ac"]["start"] = 10
+    acCircuit.hints["ac"]["end"] = 1e9
 
     try:
-        return circuit.unityGainFrequency
+        return acCircuit.unityGainFrequency
     # bandwidth undefined
     except:
         return 0
@@ -119,35 +129,70 @@ def bandwidth_loss(circuit):
 
 def evaluate(individual):
     params = params_from_ind(individual)
-    circuit = circuitTemplate(params)
+    circuits = circuitTemplateList(params)
+    acCircuit = circuits[0]
+    tranCircuit = circuits[1]
+
+    # NOTE, SPICE syntax for AC analysis:
+    # .ac dec nd fstart fstop
+    # https://ngspice.sourceforge.io/docs/ngspice-html-manual/manual.xhtml#subsec__AC__Small_Signal_AC
+    # Same hints as in Leme, 2012:
+    # ac dec 5 10 1g
+    acCircuit.hints["ac"]["variation"] = "dec"
+    acCircuit.hints["ac"]["points"] = 5
+    acCircuit.hints["ac"]["start"] = 10
+    acCircuit.hints["ac"]["end"] = 1e9
+
+    # NOTE, SPICE syntax for TRAN analysis:
+    # .tran tstep tstop
+    # https://ngspice.sourceforge.io/docs/ngspice-html-manual/manual.xhtml#subsec__TRAN__Transient_Analysis
+    # Leme, 2012:
+    # tran 0.1us 25us
+    tranCircuit.hints["tran"]["step"] = 0.1e-6
+    tranCircuit.hints["tran"]["end"] = 25e-6
 
     # TODO: look for a more elegant way than one try-except
     # for each circuit metric.
     # NOTE: Don't use a single try-except, as a good
     # performance in any single variable is worth keeping.
+    errors = set()
+
+    # NOTE: gain should not throw
+    # (it simply gets the first or the maximum amplitude value)
     try:
-        gain = numpy.absolute(circuit.gain)
+        gain = numpy.absolute(acCircuit.gain)
     except:
         gain = 0
+        errors.add("gain")
 
     try:
-        bandwidth = circuit.unityGainFrequency
+        bandwidth = acCircuit.unityGainFrequency
     except:
         bandwidth = 0
+        errors.add("unityGainFrequency")
 
+    # NOTE: staticPower (i.e., OP analysis) should not throw
     try:
-        power = circuit.staticPower
+        power = acCircuit.staticPower
     except:
         power = numpy.inf
+        errors.add("staticPower")
 
     try:
-        # TODO: evaluate the need for hints.
-        slew_rate = circuit.slewRate
+        # NOTE: hints defined above.
+        slew_rate = tranCircuit.slewRate
     except:
         slew_rate = 0
+        errors.add("slewRate")
 
     # NOTE: area doesn't throw exceptions.
     area = area_key(individual)
+
+    if len(errors) > 0:
+        for name in errors:
+            print(name, "undefined", end=", ")
+
+        print("")
 
     return gain, bandwidth, power, slew_rate, area
 
@@ -155,9 +200,19 @@ def evaluate(individual):
 # TODO: avoid instantiating a new circuit.
 def gain_key(individual):
     params = params_from_ind(individual)
-    circuit = circuitTemplate(params)
+    acCircuit = acTemplate(params)
 
-    return numpy.absolute(circuit.gain)
+    # NOTE, SPICE syntax for AC analysis:
+    # .ac dec nd fstart fstop
+    # https://ngspice.sourceforge.io/docs/ngspice-html-manual/manual.xhtml#subsec__AC__Small_Signal_AC
+    # Same hints as in Leme, 2012:
+    # ac dec 5 10 1g
+    acCircuit.hints["ac"]["variation"] = "dec"
+    acCircuit.hints["ac"]["points"] = 5
+    acCircuit.hints["ac"]["start"] = 10
+    acCircuit.hints["ac"]["end"] = 1e9
+
+    return numpy.absolute(acCircuit.gain)
 
 
 def gain_loss(circuit):
@@ -211,8 +266,13 @@ for c in classes:
     if hasattr(creator, c):
         delattr(creator, c)
 
-with open("./demos/single-stage-amplifier/single-stage-amp.cir") as f:
-    circuitTemplate = CircuitTemplate(f.read())
+with open("./demos/single-stage-amplifier/single-stage-amp-ac.cir") as f:
+    acTemplate = CircuitTemplate(f.read())
+
+with open("./demos/single-stage-amplifier/single-stage-amp-tran.cir") as f:
+    tranTemplate = CircuitTemplate(f.read())
+
+circuitTemplateList = CircuitTemplateList((acTemplate, tranTemplate))
 
 ref_points = tools.uniform_reference_points(NOBJ, P)
 
