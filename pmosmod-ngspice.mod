@@ -40,3 +40,10 @@
 + CJSWG = 6.4E-11 PBSWG = 0.8 MJSWG = 0.1987115
 + CF = 0 PVTH0 = 5.98016E-3 PRDSW = 14.8598424
 + PK2 = 3.73981E-3 WKETA = 0.0104146 LKETA = -8.958097E-3
+
+.subckt pmosckt drain gate source bulk w=0.5u l=0.5u m=1
+m0 drain gate source bulk pmosmod w={w} l={l} m={m}
++ ad={w*0.5u} as={w*0.5u}
++ pd={2*(w+0.5u)} ps={2*(w+0.5u)}
++ nrd={0.5u/w} nrs={0.5u/w}
+.ends

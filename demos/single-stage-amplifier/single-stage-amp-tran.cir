@@ -1,6 +1,7 @@
 * OTA
-.include nmosmod.mod
-.include pmosmod.mod
+.include nmosmod-ngspice.mod
+.include pmosmod-ngspice.mod
+
 C1 Vo GND 3p
 
 I1 GND Ip dc={ipol}
