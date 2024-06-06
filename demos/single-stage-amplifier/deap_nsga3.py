@@ -438,7 +438,7 @@ if __name__ == "__main__":
             sys.stdout = run_log
             with open((prefix + "error.log"), "a") as err_log:
                 sys.stderr = err_log
-                main(seed=seed, prefix_dir=prefix_dir, model=model)
+                pop, logbook = main(seed=seed, prefix_dir=prefix_dir, model=model)
                 sys.stderr = stderr
             sys.stdout = stdout
 
