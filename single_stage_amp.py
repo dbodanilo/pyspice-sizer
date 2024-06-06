@@ -85,6 +85,9 @@ def evaluate(individual):
     # NOTE: Don't use a single try-except, as a good
     # performance in any single variable is worth keeping.
     errors = set()
+
+    # NOTE: gain should not throw
+    # (it simply gets the first or the maximum amplitude value)
     try:
         gain = numpy.absolute(acCircuit.gain)
     except:
@@ -92,7 +95,6 @@ def evaluate(individual):
         errors.add("gain")
 
     try:
-        # bandwidth = circuit.bandwidth
         bandwidth = acCircuit.unityGainFrequency
     except:
         bandwidth = 0
@@ -105,10 +107,16 @@ def evaluate(individual):
         power = numpy.inf
         errors.add("staticPower")
 
-
+    # TODO: IDEIA atualizar Vpulse antes de análise transiente.
     try:
+        # NOTE: hints defined above.
         slew_rate = tranCircuit.slewRate
     except:
+        # TODO: Investigate.
+        # NOTE: quite verbose.
+        # print("slewRate undefined, hints:", tranCircuit.hints["tran"], end=", ")
+        # print("netlist:", tranCircuit.netlist)
+
         slew_rate = 0
         errors.add("slewRate")
 
@@ -131,8 +139,6 @@ def params_from_ind(individual):
 # Clean up to run script interactively (ipython).
 classes = [
     "FitnessAmp",
-    # "FitnessMax",
-    # "FitnessMin",
     "Individual",
 ]
 for c in classes:
