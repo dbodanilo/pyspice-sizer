@@ -326,7 +326,7 @@ logbook.chapters["fitness"].header = "avg", "std", "min", "max"
 
 pop = toolbox.population(n=MU)
 
-checkpoint = 50
+checkpoint = NGEN // 10
 
 
 def main(seed=None, prefix_dir="./out/single-stage-amp/", model="deap_nsga3"):
@@ -342,6 +342,7 @@ def main(seed=None, prefix_dir="./out/single-stage-amp/", model="deap_nsga3"):
 
     # TODO: implement checkpoints, to unpause ongoing optimization.
     # def main(seed=None, gen=0):  # ...
+    gen = 0
     pop = toolbox.population(n=MU)
 
     invalid_ind = [ind for ind in pop if not ind.fitness.valid]
@@ -350,6 +351,9 @@ def main(seed=None, prefix_dir="./out/single-stage-amp/", model="deap_nsga3"):
     for ind, fit in zip(invalid_ind, fitnesses):
         ind.fitness.values = fit
 
+    with open((prefix + f"pop-gen_{gen}.pickle"), "wb") as f:
+        pickle.dump(pop, f, protocol=pickle.DEFAULT_PROTOCOL)
+
     logbook = tools.Logbook()
 
     # First group by the common `gen`, `nevals`, then group by chapters
@@ -357,8 +361,11 @@ def main(seed=None, prefix_dir="./out/single-stage-amp/", model="deap_nsga3"):
     logbook.chapters["fitness"].header = "avg", "std", "min", "max"
 
     record = mstats.compile(pop)
-    logbook.record(gen=0, nevals=len(invalid_ind), **record)
+    logbook.record(gen=gen, nevals=len(invalid_ind), **record)
     print(logbook.stream)
+
+    with open((prefix + f"logbook-gen_{gen}.pickle"), "wb") as f:
+        pickle.dump(logbook, f, protocol=pickle.DEFAULT_PROTOCOL)
 
     # Begin the generational process
     for gen in range(1, NGEN):
@@ -384,6 +391,8 @@ def main(seed=None, prefix_dir="./out/single-stage-amp/", model="deap_nsga3"):
         logbook.record(gen=gen, nevals=len(invalid_ind), **record)
         print(logbook.stream)
 
+        # NOTE: two ifs so that if anything fails in between,
+        # pop still gets dumped to a file.
         if gen % checkpoint == 0:
             with open((prefix + f"logbook-gen_{gen}.pickle"), "wb") as f:
                 pickle.dump(logbook, f, protocol=pickle.DEFAULT_PROTOCOL)
@@ -498,7 +507,9 @@ if __name__ == "__main__":
             sys.stdout = run_log
             with open((prefix + "error.log"), "a") as err_log:
                 sys.stderr = err_log
-                pop, logbook = main(seed=seed, prefix_dir=prefix_dir, model=model)
+                pop, logbook = main(seed=seed,
+                                    prefix_dir=prefix_dir,
+                                    model=model)
                 sys.stderr = stderr
             sys.stdout = stdout
 
