@@ -484,7 +484,7 @@ if __name__ == "__main__":
     stdout = sys.stdout
     stderr = sys.stderr
 
-    prefix_dir = "./out/single-stage-amp/"
+    prefix_dir = "./out/single-stage-amp/deap_nsga3/"
     os.makedirs(prefix_dir, exist_ok=True)
     model = "deap_nsga3-params_deb"
 
