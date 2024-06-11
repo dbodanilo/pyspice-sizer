@@ -245,14 +245,12 @@ def main(seed_leme=1241, prefix_dir="./out/single-stage-amp/", script="compare-m
         ref_sim_scaled_sim.to_numpy()
     ))
 
-    # if seed_deap == seed_leme:
-    if True:
-        # NOTE: print accurate information.
-        print("[python calc]")
-        print("simulation score:")
-        print("raw:")
-        print(Y_sim_r2)
-        print("avg:", numpy.mean(Y_sim_r2))
+    # NOTE: print accurate information.
+    print("[python calc]")
+    print("simulation score:")
+    print("raw:")
+    print(Y_sim_r2)
+    print("avg:", numpy.mean(Y_sim_r2))
 
     # TODO: plot some view of the Pareto frontiers as well.
 
@@ -287,7 +285,7 @@ if __name__ == "__main__":
     #       ...
     for seed, path in seeds_paths:
         _now = datetime.now().strftime("%Y-%m-%d_%H-%M")
-        print(_now, "seed:", seed)
+        print(_now, "pop:", path)
 
         prefix = f"{prefix_dir}compare/{_now}_{script}-seed_{seed}-"
 
@@ -301,4 +299,4 @@ if __name__ == "__main__":
             sys.stdout = stdout
 
         _now = datetime.now().strftime("%Y-%m-%d_%H-%M")
-        print(_now, "seed:", seed)
+        print(_now, "pop:", path)
