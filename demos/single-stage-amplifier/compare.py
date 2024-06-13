@@ -6,6 +6,7 @@ import sys
 
 from datetime import datetime
 from deap.tools._hypervolume import hv
+from deap.tools.emo import assignCrowdingDist
 from math import log10
 from sklearn.metrics import r2_score
 from sklearn.preprocessing import MinMaxScaler
@@ -55,10 +56,14 @@ def ratio_from_db(db):
     return 10 ** (db / 20)
 
 
+def evaluate_series(ind):
+    return pandas.Series(evaluate(ind), index=targets)
+
+
 # seed_leme <- [1241..1245]
 def main(seed_leme=1241, prefix_dir="./out/single-stage-amp/", script="compare-metrics_leme", deap_path="deap_nsga3/2024-05-22_15-42_deap_nsga3-params_deb-seed_1241-pop.pickle"):
     _now = datetime.now().strftime("%Y-%m-%d_%H-%M")
-    print(_now, f"seed={seed_leme}")
+    print(_now, f"pop={deap_path}")
 
     # TODO: update script details as needed, e.g., metrics.
     script = f"{script}-seed_{seed_leme}"
@@ -73,17 +78,21 @@ def main(seed_leme=1241, prefix_dir="./out/single-stage-amp/", script="compare-m
 
     # pickled pop already has fitness values, but evaluate() has
     # been updated.
-    Y_deap = list(map(evaluate, deap_pop))
-    for ind, fit in zip(deap_pop, Y_deap):
+    deap_fits = numpy.array(list(map(evaluate, deap_pop)))
+
+    # TODO: actually handle the cause for inf values in Pwr.
+    numpy.place(deap_fits, ~numpy.isfinite(deap_fits), [1])
+
+    for ind, fit in zip(deap_pop, deap_fits):
         ind.fitness.values = fit
+
+    assignCrowdingDist(deap_pop)
+    deap_cds = numpy.array([ind.fitness.crowding_dist for ind in deap_pop])
 
     with open((prefix + "deap_pop.pickle"), "wb") as f:
         pickle.dump(deap_pop, f, protocol=pickle.DEFAULT_PROTOCOL)
 
-    Y_deap = pandas.DataFrame(Y_deap, columns=targets)
-
-    # TODO: actually handle the cause for inf values in Pwr.
-    Y_deap = Y_deap.replace(numpy.inf, 1)
+    Y_deap = pandas.DataFrame(deap_fits, columns=targets)
 
     Y_deap_weighted = Y_deap * y_weights
 
@@ -133,19 +142,40 @@ def main(seed_leme=1241, prefix_dir="./out/single-stage-amp/", script="compare-m
     )
     Y_deap_scaled_leme_weighted = Y_deap_scaled_leme * y_weights
 
-    X_pop = X_train.apply(creator.Individual, axis=1)
-    Y_sim = list(map(evaluate, X_pop))
+    # same values as in X_train.
+    train_pop = X_train.apply(creator.Individual, axis=1)
+    sim_pop = train_pop.copy()
 
-    for ind, fit in zip(X_pop, Y_sim):
+    # same values as in Y_train.
+    train_fits = Y_train.to_numpy()
+
+    train_pop = train_pop.to_numpy()
+    for ind, fit in zip(train_pop, train_fits):
         ind.fitness.values = fit
 
-    with open((prefix + "leme_pop.pickle"), "wb") as f:
-        pickle.dump(X_pop, f, protocol=pickle.DEFAULT_PROTOCOL)
+    assignCrowdingDist(train_pop)
+    train_cds = numpy.array([ind.fitness.crowding_dist for ind in train_pop])
 
-    Y_sim = pandas.DataFrame(Y_sim, columns=targets)
+    with open((prefix + "train_pop.pickle"), "wb") as f:
+        pickle.dump(train_pop, f, protocol=pickle.DEFAULT_PROTOCOL)
+
+    # same values as in Y_sim.
+    sim_fits = sim_pop.apply(evaluate_series).to_numpy()
+
+    sim_pop = sim_pop.to_numpy()
+    for ind, fit in zip(sim_pop, sim_fits):
+        ind.fitness.values = fit
+
+    assignCrowdingDist(sim_pop)
+    sim_cds = numpy.array([ind.fitness.crowding_dist for ind in sim_pop])
+
+    with open((prefix + "sim_pop.pickle"), "wb") as f:
+        pickle.dump(sim_pop, f, protocol=pickle.DEFAULT_PROTOCOL)
+
+    Y_sim = pandas.DataFrame(sim_fits, columns=targets)
 
     Y_sim_weighted = pandas.DataFrame(
-        numpy.array([ind.fitness.wvalues for ind in X_pop]) * -1,
+        numpy.array([ind.fitness.wvalues for ind in sim_pop]) * -1,
         columns=targets
     )
 
@@ -190,8 +220,18 @@ def main(seed_leme=1241, prefix_dir="./out/single-stage-amp/", script="compare-m
     )
     Y_train_scaled_sim_weighted = Y_train_scaled_sim * y_weights
 
-    # print("deap:", timestamp, model, seed_deap, gen, "leme:", seed_leme)
-    print("\nseed:", seed_leme)
+    print("\npop:", deap_path)
+
+    # NOTE: print accurate information.
+    print("\nsimulation score:", end="")
+    print("\n-----------------")
+    print("[python calc]")
+    print("raw:")
+    print(Y_sim_r2)
+    print("avg:", numpy.mean(Y_sim_r2))
+
+    print("\nHypervolume (hv, max):", end="")
+    print("\n----------------------")
 
     # TODO: reevaluate the relevance of raw hypervolume.
     print("raw hv:")
@@ -245,19 +285,30 @@ def main(seed_leme=1241, prefix_dir="./out/single-stage-amp/", script="compare-m
         ref_sim_scaled_sim.to_numpy()
     ))
 
-    # NOTE: print accurate information.
-    print("[python calc]")
-    print("simulation score:")
-    print("raw:")
-    print(Y_sim_r2)
-    print("avg:", numpy.mean(Y_sim_r2))
+    print("\nCrowding Distance (cd, max):", end="")
+    print("\n----------------------------")
+
+    print("\nmean cd (finite):")
+    print("deap:", numpy.mean(deap_cds[numpy.isfinite(deap_cds)]))
+    print("leme:", numpy.mean(train_cds[numpy.isfinite(train_cds)]))
+    print("simulated:", numpy.mean(sim_cds[numpy.isfinite(sim_cds)]))
+
+    print("\nmedian cd (finite):")
+    print("deap:", numpy.median(deap_cds[numpy.isfinite(deap_cds)]))
+    print("leme:", numpy.median(train_cds[numpy.isfinite(train_cds)]))
+    print("simulated:", numpy.median(sim_cds[numpy.isfinite(sim_cds)]))
+
+    print("\nmedian cd (all):")
+    print("deap:", numpy.median(deap_cds))
+    print("leme:", numpy.median(train_cds))
+    print("simulated:", numpy.median(sim_cds))
 
     # TODO: plot some view of the Pareto frontiers as well.
 
     _now = datetime.now().strftime("%Y-%m-%d_%H-%M")
     print(_now)
 
-    return X_train, X_pop, deap_pop, Y_train, Y_sim, Y_deap
+    return train_pop, sim_pop, deap_pop
 
 
 if __name__ == "__main__":
@@ -266,7 +317,7 @@ if __name__ == "__main__":
     prefix_dir = "./out/single-stage-amp/"
     os.makedirs(prefix_dir + "compare/", exist_ok=True)
 
-    script = f"compare-metrics_leme"
+    script = f"compare-metrics_leme-crowding_dist"
 
     deap_paths = [
         "deap_nsga3/2024-06-07_01-11_deap_nsga3-params_deb-seed_1241-pop.pickle",
@@ -293,7 +344,7 @@ if __name__ == "__main__":
             sys.stdout = run_log
 
             # Make them global, so they're available for interactive use.
-            X_train, X_pop, deap_pop, Y_train, Y_sim, Y_deap = main(
+            train_pop, sim_pop, deap_pop = main(
                 seed_leme=seed, prefix_dir=prefix_dir, script=script, deap_path=path)
 
             sys.stdout = stdout
