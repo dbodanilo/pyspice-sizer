@@ -5,14 +5,30 @@ import pickle
 import sys
 
 from datetime import datetime
+from deap import tools
 from deap.tools._hypervolume import hv
-from deap.tools.emo import assignCrowdingDist
-from math import log10
+from deap.tools.emo import (
+    assignCrowdingDist,
+    associate_to_niche,
+    find_extreme_points,
+    find_intercepts,
+    sortLogNondominated,
+)
+from math import comb, log10
 from sklearn.metrics import r2_score
 from sklearn.preprocessing import MinMaxScaler
 
-from single_stage_amp import creator, evaluate
+from single_stage_amp import creator, evaluate, NOBJ
 
+
+# Deb, 2014
+P = 6
+# (P + NOBJ - 1)! / (P! * (NOBJ - 1)!)
+H = comb(P + NOBJ - 1, P)  # P = 6, NOBJ = 5 -> H = 210
+# first multiple of 4 higher than or equal to H.
+MU = int(H + (4 - H % 4))  # H = 210 -> MU = 212
+
+ref_points = tools.uniform_reference_points(NOBJ, P)
 
 _now = datetime.now().strftime("%Y-%m-%d_%H-%M")
 print(_now)
@@ -44,6 +60,28 @@ y_prefixes = pandas.Series(y_prefixes, index=targets)
 # minimization as default (weight=1.0)
 y_weights = (-1.0, -1.0, 1.0, -1.0, 1.0)
 y_weights = pandas.Series(y_weights, index=targets)
+
+
+def assignNichingDist(pop):
+    pareto_fronts = sortLogNondominated(pop, MU)
+
+    fits_weighted = numpy.array(
+        [ind.fitness.wvalues for f in pareto_fronts for ind in f])
+    fits_weighted *= -1
+
+    best_point = numpy.min(fits_weighted, axis=0)
+    worst_point = numpy.max(fits_weighted, axis=0)
+
+    extreme_points = find_extreme_points(fits_weighted, best_point)
+    front_worst = numpy.max(
+        fits_weighted[:sum(len(f) for f in pareto_fronts), :], axis=0)
+    intercepts = find_intercepts(
+        extreme_points, best_point, worst_point, front_worst)
+    _, dist = associate_to_niche(
+        fits_weighted, ref_points, best_point, intercepts)
+
+    for i, d in enumerate(dist):
+        pop[i].fitness.niching_dist = d
 
 
 # dB = 20 log_{10}(ratio)
@@ -88,6 +126,9 @@ def main(seed_leme=1241, prefix_dir="./out/single-stage-amp/", script="compare-m
 
     assignCrowdingDist(deap_pop)
     deap_cds = numpy.array([ind.fitness.crowding_dist for ind in deap_pop])
+
+    assignNichingDist(deap_pop)
+    deap_nds = numpy.array([ind.fitness.niching_dist for ind in deap_pop])
 
     with open((prefix + "deap_pop.pickle"), "wb") as f:
         pickle.dump(deap_pop, f, protocol=pickle.DEFAULT_PROTOCOL)
@@ -156,6 +197,9 @@ def main(seed_leme=1241, prefix_dir="./out/single-stage-amp/", script="compare-m
     assignCrowdingDist(train_pop)
     train_cds = numpy.array([ind.fitness.crowding_dist for ind in train_pop])
 
+    assignNichingDist(train_pop)
+    train_nds = numpy.array([ind.fitness.niching_dist for ind in train_pop])
+
     with open((prefix + "train_pop.pickle"), "wb") as f:
         pickle.dump(train_pop, f, protocol=pickle.DEFAULT_PROTOCOL)
 
@@ -168,6 +212,9 @@ def main(seed_leme=1241, prefix_dir="./out/single-stage-amp/", script="compare-m
 
     assignCrowdingDist(sim_pop)
     sim_cds = numpy.array([ind.fitness.crowding_dist for ind in sim_pop])
+
+    assignNichingDist(sim_pop)
+    sim_nds = numpy.array([ind.fitness.niching_dist for ind in sim_pop])
 
     with open((prefix + "sim_pop.pickle"), "wb") as f:
         pickle.dump(sim_pop, f, protocol=pickle.DEFAULT_PROTOCOL)
@@ -303,6 +350,19 @@ def main(seed_leme=1241, prefix_dir="./out/single-stage-amp/", script="compare-m
     print("leme:", numpy.median(train_cds))
     print("simulated:", numpy.median(sim_cds))
 
+    print("\nNiching Distance (nd, min):", end="")
+    print("\n----------------------------")
+
+    print("\nmean nd:")
+    print("deap:", numpy.mean(deap_nds))
+    print("leme:", numpy.mean(train_nds))
+    print("simulated:", numpy.mean(sim_nds))
+
+    print("\nmedian nd:")
+    print("deap:", numpy.median(deap_nds))
+    print("leme:", numpy.median(train_nds))
+    print("simulated:", numpy.median(sim_nds))
+
     # TODO: plot some view of the Pareto frontiers as well.
 
     _now = datetime.now().strftime("%Y-%m-%d_%H-%M")
@@ -317,7 +377,7 @@ if __name__ == "__main__":
     prefix_dir = "./out/single-stage-amp/"
     os.makedirs(prefix_dir + "compare/", exist_ok=True)
 
-    script = f"compare-metrics_leme-crowding_dist"
+    script = f"compare-metrics_leme-crowding_dist-niching_dist"
 
     deap_paths = [
         "deap_nsga3/2024-06-07_01-11_deap_nsga3-params_deb-seed_1241-pop.pickle",
