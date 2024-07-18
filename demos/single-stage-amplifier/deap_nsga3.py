@@ -51,7 +51,7 @@ NDIM = 2 + len(LS) + len(WS)
 # ETA_M = 12.0
 
 # Deb, 2014:
-NGEN = 350  # [350..1000]
+NGEN = 1000  # [350..1000]
 CXPB = 1.0  # p_c
 MUTPB = 1.0  # TODO: review if this is correct.
 P_M = 1.0/NDIM
