@@ -98,8 +98,13 @@ def evaluate_series(ind):
     return pandas.Series(evaluate(ind), index=targets)
 
 
+# TODO
+def set_coverage():
+    pass
+
+
 # seed_leme <- [1241..1245]
-def main(seed_leme=1241, prefix_dir="./out/single-stage-amp/", script="compare-metrics_leme", deap_path="deap_nsga3/2024-05-22_15-42_deap_nsga3-params_deb-seed_1241-pop.pickle"):
+def main(seed_leme=1241, prefix_dir="./out/single-stage-amp/", script="compare-metrics_leme", deap_path="data/deap_nsga3-params_deb-seed_1241-pop.pickle"):
     _now = datetime.now().strftime("%Y-%m-%d_%H-%M")
     print(_now, f"pop={deap_path}")
 
@@ -110,7 +115,6 @@ def main(seed_leme=1241, prefix_dir="./out/single-stage-amp/", script="compare-m
     # TODO: make cleaner distinction between nsga3's and compare's directories.
     os.makedirs(prefix_dir + "compare/", exist_ok=True)
 
-    deap_path = prefix_dir + deap_path
     with open(deap_path, "rb") as pop_file:
         deap_pop = pickle.load(pop_file)
 
@@ -380,11 +384,11 @@ if __name__ == "__main__":
     script = f"compare-metrics_leme-crowding_dist-niching_dist"
 
     deap_paths = [
-        "deap_nsga3/2024-06-07_01-11_deap_nsga3-params_deb-seed_1241-pop.pickle",
-        "deap_nsga3/2024-06-07_02-39_deap_nsga3-params_deb-seed_1242-pop.pickle",
-        "deap_nsga3/2024-06-07_04-10_deap_nsga3-params_deb-seed_1243-pop.pickle",
-        "deap_nsga3/2024-06-07_05-33_deap_nsga3-params_deb-seed_1244-pop.pickle",
-        "deap_nsga3/2024-06-07_06-57_deap_nsga3-params_deb-seed_1245-pop.pickle",
+        "data/deap_nsga3-params_deb-seed_1241-pop.pickle",
+        "data/deap_nsga3-params_deb-seed_1242-pop.pickle",
+        "data/deap_nsga3-params_deb-seed_1243-pop.pickle",
+        "data/deap_nsga3-params_deb-seed_1244-pop.pickle",
+        "data/deap_nsga3-params_deb-seed_1245-pop.pickle",
     ]
 
     leme_seeds = range(1241, 1246)
@@ -400,6 +404,7 @@ if __name__ == "__main__":
 
         prefix = f"{prefix_dir}compare/{_now}_{script}-seed_{seed}-"
 
+        # NOTE: comment line below avoid output redirection.
         with open((prefix + "run.log"), "a") as run_log:
             sys.stdout = run_log
 
