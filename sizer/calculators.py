@@ -128,6 +128,7 @@ def unityGainFrequency(frequenciesInHertz, frequencyResponse, initialGuess=1e+3)
     f_i = floatCursorGet(frequenciesInHertz, i)
 
     return f_i
+
 def positiveFeedbackFrequency(frequenciesInHertz, frequencyResponse, initialGuess=1e+3):
     """Calculate the frequency in Hertz at which the phase drops to -180deg.
 
@@ -176,7 +177,6 @@ def phaseMargin(frequenciesInHertz, frequencyResponse):
         # return 180 - np.abs(phaseResponseInterpolated(ugf))
         return 180 - np.abs(np.interp(ugf, frequenciesInHertz, phaseResponse, left=np.nan, right=np.nan))
     else:
-    # except:
         raise CalculationError("impossible to calculate the phase margin, either because this circuit never reaches unity gain (which means PM makes no sense) or your simulation data is insufficient. Try simulating with wider frequency range.")
 
 def gainMargin(frequenciesInHertz, frequencyResponse):
@@ -285,9 +285,11 @@ def slewRate(timeInSecond, wave):
         assert trise > 0
         sr = (out90 - out10) / trise
     except:
-        print("time:", timeInSecond, end=", ")
-        print("wave:", wave)
-        input("Press Enter to continue...")
+        print("slewRate undefined, vout range:", f"[{np.min(wave)}, {np.max(wave)}]")
+        # NOTE: uncomment below for verbose output.
+        # print("time:", timeInSecond, end=", ")
+        # print("wave:", wave)
+        # input("Press Enter to continue...")
 
     return sr
 
@@ -304,7 +306,7 @@ def slewRateNaive(timeInSecond, wave):
     .. math::
 
         SR = \max\left|{dV_o \over dt}\right|
-    
+
     However, in some context, slew rate means the 2 thresholds (often 10% of delta and 90% of delta) divided by the time it takes the wave to rise from the low threshold to the high threshold. For example, consider a wave that travels from 1 V to 2 V. The slew rate is sometimes considered as (1.9 - 1.1) divided by the time it takes the wave to go up from 1.1 V to 1.9 V. If the duration is 1 s, then slew rate is 0.8/1 = 0.8 V/s.
     """
     return np.max(np.abs(np.diff(wave) / np.diff(timeInSecond)))
@@ -415,6 +417,7 @@ def fallingTime(timeInSecond, wave, threshold1=None, threshold2=None):
 
 
 def floatCursorRight(wave, target):
+    # index where wave is closest to target.
     i = np.argmin(abs(wave - target))
 
     # local region
@@ -434,6 +437,8 @@ def floatCursorRight(wave, target):
     # target inverts when xp was originally decreasing
     target = copysign(target, diff_x[0])
 
+    # TODO: evaluate other forms of interpolation, and compare
+    # them to what the cursor command does in SPICE.
     return np.interp(target, xp, fp)
 
 
