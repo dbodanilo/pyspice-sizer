@@ -4,12 +4,12 @@ Automatically size all design parameters in a circuit to meet design specificati
 
 ## Quick start
 
-Note: Windows is currently not supported because the dependency [PySpice](https://github.com/FabriceSalvaire/PySpice) has [an issue](https://github.com/FabriceSalvaire/PySpice/issues/23) with raw data parsing. If you *really* have to try on Windows, you can follow [my comment here](https://github.com/FabriceSalvaire/PySpice/issues/23#issuecomment-452176011). However, it is not a perfect solution because it can't tell if a `\r\n` comes as a part of bytes that represent a number or as just a line break.
+Note: Windows is currently not supported because the dependency [PySpice](https://github.com/FabriceSalvaire/PySpice) has [an issue](https://github.com/FabriceSalvaire/PySpice/issues/23) with raw data parsing. If you *really* have to try on Windows, you can follow [Shi](https://github.com/aiifabbf)'s [comment here](https://github.com/FabriceSalvaire/PySpice/issues/23#issuecomment-452176011). However, it is not a perfect solution because it can't tell if a `\r\n` comes as a part of bytes that represent a number or as just a line break.
 
 1. clone this repo
 
     ```sh
-    git clone https://github.com/aiifabbf/sizer.git
+    git clone https://github.com/dbodanilo/pyspice-sizer.git
     ```
 
 1. set up a virtual environment (recommended)
@@ -43,50 +43,41 @@ Note: Windows is currently not supported because the dependency [PySpice](https:
 1. ready to go! Check out demo!
 
     ```sh
-    python3 demos/two-stage-amplifier/main.py
+    python3 demos/single-stage-amplifier/deap_eaSimple.py
     ```
 
-## Demo: a simple-Miller compensated two-stage amplifier
+## Demo: a Single-Exit Single-Stage amplifier
 
-![structure of simple miller compensated two-stage amplifier](./demos/two-stage-amplifier/schematic.png)
-
-Design specifications chosen:
-- DC gain >= 1000x
-- phase margin >= 60 deg
-- bandwidth >= 5 kHz
+![structure of SESS amplifier](./demos/single-stage-amplifier/schematic.png)
 
 Variable parameters:
-- 12 sizes(width and length) for all MOSFETs(current mirror not shown)
-- 1 compensation capacitance
+- 12 sizes (width and length) for all MOSFETs
+- 1 bias current
+- 1 bias voltage
 
 Fixed parameters:
-- supply voltage = 3.3 V
-- load capacitance = 4 pF
-- bias current = 10 uA
-- input bias voltage = 1.65 V
-
-[![automatically designed two stage amplifier's frequency response](./demos/two-stage-amplifier/two-stage-amplifier-frequency-response.png)](./demos/two-stage-amplifier/main.py)
-
-After 1 min (on my i5 3rd generation CPU), all 3 specifications are met:
-- DC gain ~= 1387x
-- phase margin ~= 79.66 deg
-- bandwidth ~= 5.298 kHz
-
-Challenge: can you come up with a choice of all MOSFETs' sizes and the compensation capacitance to meet all the design specs **within 1 min?**
+- supply voltage = 3 V
+- load capacitance = 3 pF
 
 ## Workflow
 
 1. draw the circuit topology with your favorite tool
 1. export your circuit to SPICE netlist
 
-    A typical SPICE netlist might look like [this](./demos/two-stage-amplifier/two-stage-amp.cir)
+    A typical SPICE netlist might look like [this](./demos/single-stage-amplifier/single-stage-amp.cir)
     ```
-    *Sheet Name:/OPA_SR
-    V1  Vp GND dc 1.65 ac 0.5
-    V2  Vn GND dc 1.65 ac -0.5
-    C2  Vout GND 4e-12
-    C1  /3 Vout 1e-12
-    ...
+    * OTA
+    .include nmosmod-ngspice.mod
+    .include pmosmod-ngspice.mod
+
+    C1 Vo GND 3p
+
+    I1 GND Ip dc={ipol}
+
+    V0 VDD GND 3
+    V1 Vp GND dc={vpol}
+    V2 Vn Vp dc=0 acmag=1
+    * ...
     ```
     More details about SPICE netlist can be found in [ngspice manual.](http://ngspice.sourceforge.net/docs.html) But for most of the time, you really do not have to write the netlist on your own.
 
@@ -121,12 +112,15 @@ Challenge: can you come up with a choice of all MOSFETs' sizes and the compensat
     These placeholders represent the variable parameters you would like to optimize in later stages
     ```
     ...
-    M7  Vout /6 VDD VDD p_33 l={l7} w={w7}
-    M6  Vout /3 GND GND n_33 l={l6} w={w6}
-    M2  /3 vp /1 VDD p_33 l={l12} w={w12}
-    M1  /2 vn /1 VDD p_33 l={l12} w={w12}
-    M4  /3 /2 GND GND n_33 l={l34} w={w34}
-    ...
+    M1 n01 Vn n02 n02 nmosmod l={l12} w={w12}
+    + * ...
+    M2 n03 Vp n02 n02 nmosmod l={l12} w={w12}
+    + * ...
+
+    M3 n01 n01 VDD VDD pmosmod l={l34} w={w34}
+    + * ...
+    M4 n03 n03 VDD VDD pmosmod l={l34} w={w34}
+    + * ...
     ```
     Because this project internally use Python to substitute real values into the template, placeholders need to follow [Python's string formatting convention](https://docs.python.org/3/library/string.html#formatstrings). It is not very difficult.
 
@@ -134,14 +128,12 @@ Challenge: can you come up with a choice of all MOSFETs' sizes and the compensat
 
     Also note that the same placeholder name (like `M2`'s length `l` and `M1`'s length `l` are the same, because they are the input MOSFET of the first differential amplifying stage) will be replaced with same number later in optimization. This is particularly helpful if you want to design something symmetrical.
 
-    More features, like parameter multiplying (e.g. make `M2`'s length some 100 times the length of `M1`), will be added soon.
-
 1. read the netlist
 
     Create a new Python file `super-cool-two-stage-amplifier.py`. We will do our final work in it.
 
     ```python
-    with open("./super-cool-two-stage-amplifier.py") as f:
+    with open("./super-cool-two-stage-amplifier.cir") as f:
         template = sizer.CircuitTemplate(f.read(), rawSpice="* other raw spice statements you missed just now")
     ```
 
@@ -155,7 +147,7 @@ Challenge: can you come up with a choice of all MOSFETs' sizes and the compensat
     - bandwidth no less than 10 kHz
     - ...
 
-    Well, it is too much for a salesman (no offence, otherwise he may call himself an analog engineer) who does not know anything about circuits, let alone how to calculate the performance figures of his recommendations. So, we have to tell the optimizer how happy we are with this candidate. In convention, however, all optimizers are designed to *minimize* something rather than maximize something, so instead of expressing our happiness, we express our unhappiness, namely the *loss*.
+    Well, it is too much for a salesman (no offense, otherwise he may call himself an analog engineer) who does not know anything about circuits, let alone how to calculate the performance figures of his recommendations. So, we have to tell the optimizer how happy we are with this candidate. In convention, however, all optimizers are designed to *minimize* something rather than maximize something, so instead of expressing our happiness, we express our unhappiness, namely the *loss*.
 
     There are many forms of loss you can choose from, e.g.
     ```python
